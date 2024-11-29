@@ -6,6 +6,15 @@
     <title>Telegram Referral System</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        :root {
+            --tg-theme-bg-color: #fff;
+            --tg-theme-text-color: #000;
+            --tg-theme-hint-color: #999;
+            --tg-theme-link-color: #2481cc;
+            --tg-theme-button-color: #2481cc;
+            --tg-theme-button-text-color: #fff;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,64 +23,70 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--tg-theme-bg-color, #fff);
-            color: var(--tg-theme-text-color, #000);
-        }
-
-        .container {
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            padding: 20px;
             max-width: 500px;
             margin: 0 auto;
-            padding: 20px;
         }
 
-        .profile {
+        .user-info {
             text-align: center;
             padding: 20px;
             margin-bottom: 20px;
-            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            background: rgba(0, 0, 0, 0.05);
             border-radius: 12px;
         }
 
-        .profile-image {
+        .user-avatar {
             width: 80px;
             height: 80px;
             border-radius: 50%;
             margin-bottom: 10px;
         }
 
-        .profile-name {
+        .user-name {
             font-size: 1.2em;
             font-weight: bold;
             margin-bottom: 5px;
         }
 
-        .profile-username {
-            color: var(--tg-theme-hint-color, #999);
-            margin-bottom: 15px;
+        .user-username {
+            color: var(--tg-theme-hint-color);
         }
 
         .stats {
-            display: flex;
-            justify-content: space-around;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
             margin: 20px 0;
-            padding: 15px;
-            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
-            border-radius: 12px;
         }
 
-        .stat-item {
+        .stat-card {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 15px;
+            border-radius: 10px;
             text-align: center;
         }
 
         .stat-value {
-            font-size: 1.5em;
+            font-size: 24px;
             font-weight: bold;
-            color: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-color);
         }
 
         .stat-label {
-            font-size: 0.9em;
-            color: var(--tg-theme-hint-color, #999);
+            font-size: 14px;
+            color: var(--tg-theme-hint-color);
+        }
+
+        .referral-link {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            word-break: break-all;
+            font-size: 14px;
         }
 
         .button {
@@ -79,11 +94,11 @@
             width: 100%;
             padding: 12px;
             margin: 10px 0;
-            background: var(--tg-theme-button-color, #2481cc);
-            color: var(--tg-theme-button-text-color, #fff);
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
             border: none;
             border-radius: 8px;
-            font-size: 1em;
+            font-size: 16px;
             cursor: pointer;
             transition: opacity 0.2s;
         }
@@ -92,121 +107,206 @@
             opacity: 0.9;
         }
 
-        .referral-link {
-            padding: 12px;
-            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
-            border-radius: 8px;
-            margin: 10px 0;
-            word-break: break-all;
-            font-size: 0.9em;
-        }
-
-        .copied-toast {
+        .toast {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 10px 20px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
             color: white;
+            padding: 10px 20px;
             border-radius: 20px;
+            font-size: 14px;
             display: none;
+        }
+
+        #referralsList {
+            margin-top: 20px;
+        }
+
+        .referral-item {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="profile">
-            <img id="profileImage" class="profile-image" src="" alt="Profile">
-            <div class="profile-name" id="profileName"></div>
-            <div class="profile-username" id="profileUsername"></div>
-        </div>
-
-        <div class="stats">
-            <div class="stat-item">
-                <div class="stat-value" id="referralCount">0</div>
-                <div class="stat-label">Referrals</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" id="pointsCount">0</div>
-                <div class="stat-label">Points</div>
-            </div>
-        </div>
-
-        <div class="referral-link" id="referralLink"></div>
-
-        <button class="button" onclick="copyReferralLink()">Copy Invite Link</button>
-        <button class="button" onclick="shareReferralLink()">Share Invite Link</button>
+    <div class="user-info">
+        <img id="userAvatar" class="user-avatar" src="default-avatar.png" alt="User avatar">
+        <div class="user-name" id="userName">Loading...</div>
+        <div class="user-username" id="userUsername">@username</div>
     </div>
 
-    <div class="copied-toast" id="copiedToast">Copied to clipboard!</div>
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value" id="referralCount">0</div>
+            <div class="stat-label">Referrals</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="pointsCount">0</div>
+            <div class="stat-label">Points</div>
+        </div>
+    </div>
+
+    <div class="referral-link" id="referralLink">Loading referral link...</div>
+
+    <button class="button" onclick="copyReferralLink()">Copy Link</button>
+    <button class="button" onclick="shareReferralLink()">Share Link</button>
+
+    <div id="referralsList"></div>
+    <div class="toast" id="toast"></div>
 
     <script>
-        let tg = window.Telegram.WebApp;
-        tg.expand();
+        // Initialize Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        let user = null;
+        const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec'; // Replace with your webapp URL
+        const BOT_USERNAME = 'reftesed_bot'; // Ví dụ: 'my_referral_bot'
 
-        // Initialize user data when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            if (tg.initDataUnsafe.user) {
-                const user = tg.initDataUnsafe.user;
-                document.getElementById('profileName').textContent = `${user.first_name} ${user.last_name || ''}`;
-                document.getElementById('profileUsername').textContent = `@${user.username || 'no username'}`;
-                document.getElementById('profileImage').src = user.photo_url || 'default-avatar.png';
-                
-                // Set the referral link with user's ID
-                const referralLink = `https://t.me/reftesed_bot?start=${user.id}`;
-                document.getElementById('referralLink').textContent = referralLink;
-
-                // Fetch user's referral stats
-                fetchUserStats(user.id);
-            }
+        // Main initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeWebApp();
         });
 
-        f// Thay thế phần fetchUserStats trong file index.html với đoạn code sau:
-function fetchUserStats(userId) {
-    // URL của Google Apps Script web app của bạn
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec';
-    
-    fetch(`${scriptUrl}?userId=${userId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                console.error('Error:', data.error);
-                return;
-            }
-            
-            // Cập nhật số liệu thống kê
-            document.getElementById('referralCount').textContent = data.stats.referralCount;
-            document.getElementById('pointsCount').textContent = data.stats.points;
-        })
-        .catch(error => console.error('Error:', error));
-}
+        // Initialize the web app
+        function initializeWebApp() {
+            tg.expand();
+            tg.enableClosingConfirmation();
 
-        function copyReferralLink() {
-            const referralLink = document.getElementById('referralLink').textContent;
-            navigator.clipboard.writeText(referralLink)
-                .then(() => showToast())
-                .catch(err => console.error('Failed to copy:', err));
+            // Get user data from Telegram WebApp
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                user = tg.initDataUnsafe.user;
+                updateUserInterface();
+                fetchUserData();
+            } else {
+                showToast('Could not get user data');
+            }
+
+            // Set WebApp theme
+            document.documentElement.className = tg.colorScheme;
         }
 
+        // Update UI with user data
+        function updateUserInterface() {
+            document.getElementById('userName').textContent = 
+                `${user.first_name} ${user.last_name || ''}`;
+            document.getElementById('userUsername').textContent = 
+                user.username ? `@${user.username}` : '';
+            if (user.photo_url) {
+                document.getElementById('userAvatar').src = user.photo_url;
+            }
+        }
+
+        // Fetch user data from server
+        async function fetchUserData() {
+            try {
+                const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                updateStats(data);
+                updateReferralLink(data.bot.username);
+                updateReferralsList(data.referrals);
+            } catch (error) {
+                showToast('Error fetching user data: ' + error.message);
+            }
+        }
+
+        // Update statistics display
+        function updateStats(data) {
+            document.getElementById('referralCount').textContent = 
+                data.stats.referralCount || 0;
+            document.getElementById('pointsCount').textContent = 
+                data.stats.points || 0;
+        }
+
+        // Update referral link
+        
+        function updateReferralLink() {
+            const referralLink = `https://t.me/${BOT_USERNAME}?start=${user.id}`;
+            document.getElementById('referralLink').textContent = referralLink;
+        }
+
+        // Update referrals list
+        function updateReferralsList(referrals) {
+            const container = document.getElementById('referralsList');
+            if (!referrals || referrals.length === 0) return;
+
+            const html = referrals.map(ref => `
+                <div class="referral-item">
+                    ${ref.username ? `@${ref.username}` : 'Anonymous User'}
+                    <span style="float: right; color: var(--tg-theme-hint-color);">
+                        ${new Date(ref.date).toLocaleDateString()}
+                    </span>
+                </div>
+            `).join('');
+
+            container.innerHTML = `
+                <h3 style="margin-bottom: 10px;">Your Referrals</h3>
+                ${html}
+            `;
+        }
+
+        // Copy referral link
+        async function copyReferralLink() {
+            const referralLink = document.getElementById('referralLink').textContent;
+            try {
+                await navigator.clipboard.writeText(referralLink);
+                showToast('Link copied!');
+            } catch (err) {
+                // Fallback for browsers that don't support clipboard API
+                const textArea = document.createElement('textarea');
+                textArea.value = referralLink;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('Link copied!');
+                } catch (error) {
+                    showToast('Failed to copy link');
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        // Share referral link
         function shareReferralLink() {
             const referralLink = document.getElementById('referralLink').textContent;
-            tg.ShareWebApp({
-                text: `Join me using my referral link: ${referralLink}`
-            });
+            const text = `Join me on this awesome bot using my referral link! ${referralLink}`;
+            
+            if (tg.platform === 'android' || tg.platform === 'ios') {
+                // Use native sharing on mobile devices
+                tg.shareUrl(referralLink);
+            } else {
+                // Use Telegram's built-in share feature
+                tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`);
+            }
         }
 
-        function showToast() {
-            const toast = document.getElementById('copiedToast');
+        // Show toast message
+        function showToast(message, duration = 2000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
             toast.style.display = 'block';
             setTimeout(() => {
                 toast.style.display = 'none';
-            }, 2000);
+            }, duration);
         }
 
-        // Listen for theme changes
-        tg.onEvent('themeChanged', function() {
-            // The CSS variables will automatically update
+        // Handle back button
+        tg.BackButton.onClick(() => {
+            tg.close();
+        });
+
+        // Handle theme changes
+        tg.onEvent('themeChanged', () => {
+            document.documentElement.className = tg.colorScheme;
         });
     </script>
 </body>
