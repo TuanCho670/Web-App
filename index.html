@@ -200,23 +200,31 @@
             }
         }
 
-        // Fetch user data from server
-        async function fetchUserData() {
-            try {
-                const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
-                const data = await response.json();
+// Fetch user data from server
+async function fetchUserData() {
+    try {
+        const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
+        const data = await response.json();
 
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                updateStats(data);
-                updateReferralLink(data.bot.username);
-                updateReferralsList(data.referrals);
-            } catch (error) {
-                showToast('Error fetching user data: ' + error.message);
-            }
+        if (data.error) {
+            showToast(data.error);
+            return;
         }
+
+        // Cập nhật UI với dữ liệu từ server
+        updateStats(data);
+        updateReferralLink(data.bot.username);
+        
+        // Nếu là user mới, hiện thông báo chào mừng
+        if (!data.user || data.user.points === 0) {
+            showToast('Welcome to our referral system!');
+        }
+
+    } catch (error) {
+        showToast('Error connecting to server');
+        console.error('Error:', error);
+    }
+}
 
         // Update statistics display
         function updateStats(data) {
