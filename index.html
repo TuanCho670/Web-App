@@ -195,18 +195,19 @@ async function fetchUserData() {
             return;
         }
 
-        // Log để debug
-        console.log("Sending user data:", user);
-
         const queryParams = new URLSearchParams({
             userId: user.id,
             username: user.username || '',
             firstName: user.first_name || '',
             lastName: user.last_name || ''
-        }).toString();
+        });
 
         const response = await fetch(`${WEBAPP_URL}?${queryParams}`);
         console.log('Response status:', response.status);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
         const data = await response.json();
         console.log('Received data:', data);
@@ -215,11 +216,16 @@ async function fetchUserData() {
             throw new Error(data.error);
         }
 
-        updateStats(data);
+        // Cập nhật UI với dữ liệu mới
+        document.getElementById('referralCount').textContent = 
+            data.user.referrals || 0;
+        document.getElementById('pointsCount').textContent = 
+            data.user.points || 0;
+            
         updateReferralLink();
 
     } catch (error) {
-        console.error('Detailed fetch error:', error);
+        console.error('Data fetch error:', error);
         showToast('Error loading user data: ' + error.message);
     }
 }
