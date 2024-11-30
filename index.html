@@ -200,18 +200,23 @@ function updateUserInterface() {
         document.getElementById('userPhoto').src = user.photo_url;
     }
 }
-
-// Fetch user data from server
 async function fetchUserData() {
     try {
         if (!user || !user.id) {
-            showToast('Invalid user data');
-            return;
+            throw new Error('Invalid user data');
         }
 
-        const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
-        console.log('Response:', response);
+        // Gửi thông tin user để đăng ký nếu chưa có
+        const queryParams = new URLSearchParams({
+            userId: user.id,
+            username: user.username || '',
+            firstName: user.first_name || '',
+            lastName: user.last_name || ''
+        });
 
+        console.log('Fetching data for user:', user);
+        const response = await fetch(`${WEBAPP_URL}?${queryParams}`);
+        
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -223,13 +228,19 @@ async function fetchUserData() {
             throw new Error(data.error);
         }
 
-        // Update UI with received data
-        updateStats(data);
-        setupReferralLink(data.bot.username);
+        // Update UI
+        document.getElementById('referralCount').textContent = data.stats.referrals || '0';
+        document.getElementById('pointsCount').textContent = data.stats.points || '0';
+        
+        // Update referral link
+        if (data.bot?.username) {
+            const referralLink = `https://t.me/${data.bot.username}?start=${user.id}`;
+            document.getElementById('referralLink').textContent = referralLink;
+        }
 
     } catch (error) {
         console.error('Error fetching data:', error);
-        showToast('Error loading user data');
+        showToast(`Error loading user data: ${error.message}`);
     }
 }
 
