@@ -150,27 +150,30 @@
         let user = null;
         let lastUpdate = 0;
 
+        // Initialize Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        let user = null;
+        let lastUpdate = 0;
+
         // Initialize the web app
         document.addEventListener('DOMContentLoaded', () => {
             initializeWebApp();
         });
 
-        async function initializeWebApp() {
+        function initializeWebApp() {
             try {
-                // Expand to full size
                 tg.expand();
 
-                // Get user data
                 if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                     user = tg.initDataUnsafe.user;
                     updateUserInterface();
-                    await fetchUserData();
+                    fetchUserData();
+                    setupMainButton();
                     startPeriodicUpdates();
                 } else {
                     showToast('Could not get user data');
                 }
 
-                // Set theme
                 document.documentElement.className = tg.colorScheme;
             } catch (error) {
                 console.error('Initialization error:', error);
@@ -178,8 +181,31 @@
             }
         }
 
+        function setupMainButton() {
+            const mainButton = tg.MainButton;
+            mainButton.setText('Share Referral Link');
+            mainButton.onClick(() => {
+                const referralLink = document.getElementById('referralLink').textContent;
+                tg.showPopup({
+                    title: 'Share Referral Link',
+                    message: 'Choose how to share your link:',
+                    buttons: [
+                        {type: 'default', text: 'Copy to Clipboard', id: 'copy'},
+                        {type: 'default', text: 'Share via Telegram', id: 'telegram'},
+                        {type: 'cancel', text: 'Cancel'}
+                    ]
+                }, (buttonId) => {
+                    if (buttonId === 'copy') {
+                        copyToClipboard(referralLink);
+                    } else if (buttonId === 'telegram') {
+                        shareViaTelegram(referralLink);
+                    }
+                });
+            });
+            mainButton.show();
+        }
+
         function updateUserInterface() {
-            // Update profile information
             document.getElementById('userName').textContent = 
                 `${user.first_name} ${user.last_name || ''}`;
             document.getElementById('userUsername').textContent = 
@@ -189,56 +215,32 @@
             }
         }
 
-async function fetchUserData() {
-    try {
-        // Log để debug
-        console.log('Fetching data for user:', user.id);
-        console.log('WebApp URL:', WEBAPP_URL);
+        async function fetchUserData() {
+            try {
+                console.log('Fetching data for user:', user.id);
+                const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
+                console.log('Response status:', response.status);
 
-        // Kiểm tra URL và user ID
-        if (!WEBAPP_URL || !user.id) {
-            showToast('Invalid configuration');
-            console.error('URL or UserID missing:', { WEBAPP_URL, userId: user.id });
-            return;
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Received data:', data);
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                updateStats(data);
+                updateReferralLink();
+
+            } catch (error) {
+                console.error('Data fetch error:', error);
+                showToast('Error loading user data');
+            }
         }
 
-        const requestUrl = `${WEBAPP_URL}?userId=${user.id}`;
-        console.log('Request URL:', requestUrl);
-
-        // Thực hiện request với timeout
-        const response = await Promise.race([
-            fetch(requestUrl),
-            new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Request timeout')), 10000)
-            )
-        ]);
-
-        console.log('Response status:', response.status);
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('Received data:', data);
-
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        // Kiểm tra data có đúng format không
-        if (!data.stats) {
-            throw new Error('Invalid data format');
-        }
-
-        updateStats(data);
-        updateReferralLink();
-
-    } catch (error) {
-        console.error('Detailed fetch error:', error);
-        showToast('Error loading user data: ' + error.message);
-    }
-}
         function updateStats(data) {
             document.getElementById('referralCount').textContent = 
                 data.stats.referralCount || 0;
@@ -251,36 +253,39 @@ async function fetchUserData() {
             document.getElementById('referralLink').textContent = referralLink;
         }
 
-        async function copyReferralLink() {
+        function copyLink() {
             const referralLink = document.getElementById('referralLink').textContent;
-            try {
-                await navigator.clipboard.writeText(referralLink);
-                showToast('Link copied!');
-            } catch (err) {
-                // Fallback for browsers that don't support clipboard API
+            copyToClipboard(referralLink);
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text)
+                    .then(() => showToast('Link copied!'))
+                    .catch(() => showToast('Failed to copy'));
+            } else {
                 const textArea = document.createElement('textarea');
-                textArea.value = referralLink;
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
                 document.body.appendChild(textArea);
                 textArea.select();
+
                 try {
                     document.execCommand('copy');
                     showToast('Link copied!');
                 } catch (error) {
-                    showToast('Failed to copy link');
+                    showToast('Failed to copy');
+                } finally {
+                    textArea.remove();
                 }
-                document.body.removeChild(textArea);
             }
         }
 
-        function shareReferralLink() {
-            const referralLink = document.getElementById('referralLink').textContent;
-            if (tg.platform === 'android' || tg.platform === 'ios') {
-                // Use native sharing on mobile
-                tg.shareUrl(referralLink);
-            } else {
-                // Use Telegram's built-in share feature
-                tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent('Join using my referral link!')}`);
-            }
+        function shareViaTelegram(referralLink) {
+            const text = 'Join using my referral link!';
+            const url = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`;
+            tg.openTelegramLink(url);
         }
 
         function startPeriodicUpdates() {
@@ -301,14 +306,16 @@ async function fetchUserData() {
             }, duration);
         }
 
+        // Handle back button
+        if (tg.BackButton) {
+            tg.BackButton.onClick(() => {
+                tg.close();
+            });
+        }
+
         // Handle theme changes
         tg.onEvent('themeChanged', () => {
             document.documentElement.className = tg.colorScheme;
-        });
-
-        // Handle back button
-        tg.BackButton.onClick(() => {
-            tg.close();
         });
     </script>
 </body>
