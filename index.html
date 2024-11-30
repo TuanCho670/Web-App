@@ -156,9 +156,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeWebApp();
 });
 
+// Thêm logging cho initializeWebApp
 function initializeWebApp() {
     try {
-        webApp.expand();
+        webApp = window.Telegram.WebApp;
+        console.log('WebApp initialized:', webApp);
         
         if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
             user = webApp.initDataUnsafe.user;
@@ -166,12 +168,11 @@ function initializeWebApp() {
             updateUserInterface();
             fetchUserData();
             setupMainButton();
-            startPeriodicUpdates();
         } else {
+            console.log('No user data in WebApp');
             showToast('Could not get user data');
         }
 
-        document.documentElement.className = webApp.colorScheme;
     } catch (error) {
         console.error('Initialization error:', error);
         showToast('Error initializing app');
@@ -190,10 +191,13 @@ function updateUserInterface() {
 
 async function fetchUserData() {
     try {
-        if (!user) {
+        if (!user || !user.id) {
+            console.log('No user data available');
             showToast('Could not get user data');
             return;
         }
+
+        console.log('Fetching data for user:', user.id);
 
         const queryParams = new URLSearchParams({
             userId: user.id,
@@ -202,8 +206,8 @@ async function fetchUserData() {
             lastName: user.last_name || ''
         });
 
-        const response = await fetch(`${WEBAPP_URL}?${queryParams}`);
-        console.log('Response status:', response.status);
+        const response = await fetch(`${WEBAPP_URL}?${queryParams.toString()}`);
+        console.log('Response:', response);
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -216,19 +220,20 @@ async function fetchUserData() {
             throw new Error(data.error);
         }
 
-        // Cập nhật UI với dữ liệu mới
-        document.getElementById('referralCount').textContent = 
-            data.user.referrals || 0;
-        document.getElementById('pointsCount').textContent = 
-            data.user.points || 0;
-            
-        updateReferralLink();
+        // Cập nhật UI
+        document.getElementById('referralCount').textContent = data.user?.referrals || 0;
+        document.getElementById('pointsCount').textContent = data.user?.points || 0;
+        
+        // Cập nhật referral link
+        const referralLink = `https://t.me/${data.bot.username}?start=${user.id}`;
+        document.getElementById('referralLink').textContent = referralLink;
 
     } catch (error) {
-        console.error('Data fetch error:', error);
-        showToast('Error loading user data: ' + error.message);
+        console.error('Error fetching user data:', error);
+        showToast('Error loading user data');
     }
 }
+
 
 function updateStats(data) {
     document.getElementById('referralCount').textContent = 
