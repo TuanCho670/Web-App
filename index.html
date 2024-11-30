@@ -150,24 +150,36 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeWebApp();
 });
 
-// Initialize Telegram WebApp
+// Thêm xử lý BackButton vào hàm initializeWebApp
 function initializeWebApp() {
     try {
         webApp = window.Telegram.WebApp;
-        webApp.expand(); // Expand to full height
+        webApp.expand();
         
-        // Check if we have user data
+        // Setup BackButton
+        if (webApp.BackButton) {
+            webApp.BackButton.onClick(() => {
+                webApp.close();
+            });
+        }
+
+        // Kiểm tra user data
         if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
             user = webApp.initDataUnsafe.user;
             console.log('User data:', user);
             
-            // Update UI and fetch data
             updateUserInterface();
             fetchUserData();
             setupMainButton();
         } else {
             showToast('Could not get user data');
         }
+
+        // Setup theme handler
+        webApp.onEvent('themeChanged', () => {
+            document.documentElement.className = webApp.colorScheme;
+        });
+
     } catch (error) {
         console.error('Initialization error:', error);
         showToast('Error initializing app');
