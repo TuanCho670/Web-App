@@ -190,19 +190,23 @@ function updateUserInterface() {
 
 async function fetchUserData() {
     try {
+        if (!user) {
+            showToast('Could not get user data');
+            return;
+        }
+
+        // Log để debug
+        console.log("Sending user data:", user);
+
         const queryParams = new URLSearchParams({
             userId: user.id,
             username: user.username || '',
             firstName: user.first_name || '',
             lastName: user.last_name || ''
-        });
+        }).toString();
 
         const response = await fetch(`${WEBAPP_URL}?${queryParams}`);
         console.log('Response status:', response.status);
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
 
         const data = await response.json();
         console.log('Received data:', data);
@@ -213,11 +217,10 @@ async function fetchUserData() {
 
         updateStats(data);
         updateReferralLink();
-        updateReferralsList(data.referrals?.list || []);
 
     } catch (error) {
-        console.error('Data fetch error:', error);
-        showToast('Error loading user data');
+        console.error('Detailed fetch error:', error);
+        showToast('Error loading user data: ' + error.message);
     }
 }
 
