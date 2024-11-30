@@ -165,6 +165,8 @@
         let user = null;
         const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec'; // Replace with your webapp URL
         const BOT_USERNAME = 'o2penbox_bot'; // Ví dụ: 'my_referral_bot'
+        let lastUpdate = 0;
+        const UPDATE_INTERVAL = 5000; // Cập nhật mỗi 5 giây
 
         // Main initialization
         document.addEventListener('DOMContentLoaded', () => {
@@ -226,13 +228,29 @@ async function fetchUserData() {
     }
 }
 
-        // Update statistics display
-        function updateStats(data) {
-            document.getElementById('referralCount').textContent = 
-                data.stats.referralCount || 0;
-            document.getElementById('pointsCount').textContent = 
-                data.stats.points || 0;
+// Modify fetchUserData function
+async function fetchUserData() {
+    try {
+        const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
+        const data = await response.json();
+
+        if (data.error) {
+            showToast(data.error);
+            return;
         }
+
+        updateStats(data);
+        updateReferralLink(data.bot.username);
+        if (data.referrals && data.referrals.list) {
+            updateReferralsList(data.referrals.list);
+        }
+        
+        lastUpdate = Date.now();
+    } catch (error) {
+        showToast('Error connecting to server');
+        console.error('Error:', error);
+    }
+}
 
         // Update referral link
         
@@ -260,6 +278,37 @@ async function fetchUserData() {
                 ${html}
             `;
         }
+
+        // Hàm cập nhật dữ liệu
+async function updateUserData() {
+    if (!user || Date.now() - lastUpdate < UPDATE_INTERVAL) return;
+    
+    try {
+        const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Error:', data.error);
+            return;
+        }
+        
+        // Cập nhật UI
+        document.getElementById('referralCount').textContent = data.stats.referralCount || 0;
+        document.getElementById('pointsCount').textContent = data.stats.points || 0;
+        
+        // Cập nhật danh sách referrals nếu có thay đổi
+        if (data.referrals && data.referrals.list) {
+            updateReferralsList(data.referrals.list);
+        }
+        
+        lastUpdate = Date.now();
+    } catch (error) {
+        console.error('Error fetching updates:', error);
+    }
+}
+
+// Thêm interval để tự động cập nhật
+setInterval(updateUserData, UPDATE_INTERVAL);
 
         // Copy referral link
         async function copyReferralLink() {
