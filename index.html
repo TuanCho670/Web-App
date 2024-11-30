@@ -142,7 +142,7 @@
     <script>
         // Constants
         const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec';
-        const BOT_USERNAME = 'o2penbox_bot';
+        const botUsername = 'o2penbox_bot';
         const UPDATE_INTERVAL = 5000; // 5 seconds
         
         // Initialize Telegram WebApp
@@ -156,28 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeWebApp();
 });
 
-// Thêm logging cho initializeWebApp
-function initializeWebApp() {
-    try {
-        webApp = window.Telegram.WebApp;
-        console.log('WebApp initialized:', webApp);
-        
-        if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
-            user = webApp.initDataUnsafe.user;
-            console.log('User data:', user);
-            updateUserInterface();
-            fetchUserData();
-            setupMainButton();
-        } else {
-            console.log('No user data in WebApp');
-            showToast('Could not get user data');
-        }
-
-    } catch (error) {
-        console.error('Initialization error:', error);
-        showToast('Error initializing app');
-    }
-}
+initializeWebApp
 
 function updateUserInterface() {
     document.getElementById('userName').textContent = 
@@ -192,41 +171,24 @@ function updateUserInterface() {
 async function fetchUserData() {
     try {
         if (!user || !user.id) {
-            console.log('No user data available');
-            showToast('Could not get user data');
-            return;
+            throw new Error('Invalid user data');
         }
 
-        console.log('Fetching data for user:', user.id);
-
-        const queryParams = new URLSearchParams({
-            userId: user.id,
-            username: user.username || '',
-            firstName: user.first_name || '',
-            lastName: user.last_name || ''
-        });
-
-        const response = await fetch(`${WEBAPP_URL}?${queryParams.toString()}`);
-        console.log('Response:', response);
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
+        const response = await fetch(`${WEBAPP_URL}?action=getUser&userId=${user.id}`);
         const data = await response.json();
-        console.log('Received data:', data);
 
         if (data.error) {
+            // Nếu user chưa tồn tại, tạo mới
+            if (data.error === 'User not found') {
+                await registerNewUser();
+                return fetchUserData(); // Gọi lại để lấy dữ liệu
+            }
             throw new Error(data.error);
         }
 
         // Cập nhật UI
-        document.getElementById('referralCount').textContent = data.user?.referrals || 0;
-        document.getElementById('pointsCount').textContent = data.user?.points || 0;
-        
-        // Cập nhật referral link
-        const referralLink = `https://t.me/${data.bot.username}?start=${user.id}`;
-        document.getElementById('referralLink').textContent = referralLink;
+        updateStats(data);
+        updateReferralLink(data.bot.username);
 
     } catch (error) {
         console.error('Error fetching user data:', error);
@@ -234,16 +196,42 @@ async function fetchUserData() {
     }
 }
 
+        async function registerNewUser() {
+    try {
+        const response = await fetch(`${WEBAPP_URL}?action=register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                userId: user.id,
+                username: user.username || '',
+                firstName: user.first_name || '',
+                lastName: user.last_name || ''
+            })
+        });
 
-function updateStats(data) {
-    document.getElementById('referralCount').textContent = 
-        data.stats.referralCount || 0;
-    document.getElementById('pointsCount').textContent = 
-        data.stats.points || 0;
+        const data = await response.json();
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        console.log('User registered successfully');
+        return data;
+
+    } catch (error) {
+        console.error('Error registering user:', error);
+        throw error;
+    }
 }
 
-function updateReferralLink() {
-    const referralLink = `https://t.me/${BOT_USERNAME}?start=${user.id}`;
+function updateStats(data) {
+    document.getElementById('referralCount').textContent = data.stats.referrals || 0;
+    document.getElementById('pointsCount').textContent = data.stats.points || 0;
+}
+
+function updateReferralLink(botUsername) {
+    const referralLink = `https://t.me/${botUsername}?start=${user.id}`;
     document.getElementById('referralLink').textContent = referralLink;
 }
 
