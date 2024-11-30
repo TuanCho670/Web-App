@@ -142,128 +142,136 @@
     <script>
         // Constants
         const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec';
-        const botUsername = 'o2penbox_bot';
-        const UPDATE_INTERVAL = 5000; // 5 seconds
-        
-        // Initialize Telegram WebApp
-        const tg = window.Telegram.WebApp;
-        let user = null;
-        let lastUpdate = 0;
-        
-        // Initialize the web app
+let webApp;
+let user = null;
+
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    webApp = window.Telegram.WebApp;
     initializeWebApp();
 });
 
-initializeWebApp
+// Initialize Telegram WebApp
+function initializeWebApp() {
+    try {
+        webApp = window.Telegram.WebApp;
+        webApp.expand(); // Expand to full height
+        
+        // Check if we have user data
+        if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
+            user = webApp.initDataUnsafe.user;
+            console.log('User data:', user);
+            
+            // Update UI and fetch data
+            updateUserInterface();
+            fetchUserData();
+            setupMainButton();
+        } else {
+            showToast('Could not get user data');
+        }
+    } catch (error) {
+        console.error('Initialization error:', error);
+        showToast('Error initializing app');
+    }
+}
 
+// Update basic user interface
 function updateUserInterface() {
+    if (!user) return;
+    
+    // Update profile info
     document.getElementById('userName').textContent = 
         `${user.first_name} ${user.last_name || ''}`;
     document.getElementById('userUsername').textContent = 
         user.username ? `@${user.username}` : '';
+    
     if (user.photo_url) {
         document.getElementById('userPhoto').src = user.photo_url;
     }
 }
 
+// Fetch user data from server
 async function fetchUserData() {
     try {
         if (!user || !user.id) {
-            throw new Error('Invalid user data');
+            showToast('Invalid user data');
+            return;
         }
 
-        const response = await fetch(`${WEBAPP_URL}?action=getUser&userId=${user.id}`);
+        const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
+        console.log('Response:', response);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
+        console.log('Received data:', data);
 
         if (data.error) {
-            // Nếu user chưa tồn tại, tạo mới
-            if (data.error === 'User not found') {
-                await registerNewUser();
-                return fetchUserData(); // Gọi lại để lấy dữ liệu
-            }
             throw new Error(data.error);
         }
 
-        // Cập nhật UI
+        // Update UI with received data
         updateStats(data);
-        updateReferralLink(data.bot.username);
+        setupReferralLink(data.bot.username);
 
     } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error fetching data:', error);
         showToast('Error loading user data');
     }
 }
 
-        async function registerNewUser() {
-    try {
-        const response = await fetch(`${WEBAPP_URL}?action=register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                userId: user.id,
-                username: user.username || '',
-                firstName: user.first_name || '',
-                lastName: user.last_name || ''
-            })
-        });
-
-        const data = await response.json();
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        console.log('User registered successfully');
-        return data;
-
-    } catch (error) {
-        console.error('Error registering user:', error);
-        throw error;
-    }
-}
-
+// Update statistics display
 function updateStats(data) {
-    document.getElementById('referralCount').textContent = data.stats.referrals || 0;
-    document.getElementById('pointsCount').textContent = data.stats.points || 0;
+    document.getElementById('referralCount').textContent = 
+        data.user?.referrals || 0;
+    document.getElementById('pointsCount').textContent = 
+        data.user?.points || 0;
 }
 
-function updateReferralLink(botUsername) {
+// Setup referral link
+function setupReferralLink(botUsername) {
     const referralLink = `https://t.me/${botUsername}?start=${user.id}`;
     document.getElementById('referralLink').textContent = referralLink;
 }
 
+// Setup main button
 function setupMainButton() {
     const mainButton = webApp.MainButton;
     mainButton.setText('Share Referral Link');
     mainButton.onClick(() => {
-        webApp.showPopup({
-            title: 'Share Referral Link',
-            message: 'Choose how to share your link:',
-            buttons: [
-                {type: 'default', text: 'Copy to Clipboard', id: 'copy'},
-                {type: 'default', text: 'Share via Telegram', id: 'telegram'},
-                {type: 'cancel', text: 'Cancel'}
-            ]
-        }, (buttonId) => {
-            if (buttonId === 'copy') {
-                copyToClipboard(document.getElementById('referralLink').textContent);
-            } else if (buttonId === 'telegram') {
-                shareViaTelegram();
-            }
-        });
+        showShareOptions();
     });
     mainButton.show();
 }
 
-function copyToClipboard(text) {
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text)
-            .then(() => showToast('Link copied!'))
-            .catch(() => showToast('Failed to copy'));
-    } else {
+// Show share options
+function showShareOptions() {
+    const referralLink = document.getElementById('referralLink').textContent;
+    webApp.showPopup({
+        title: 'Share Referral Link',
+        message: 'Choose how to share your link:',
+        buttons: [
+            {type: 'default', text: 'Copy to Clipboard', id: 'copy'},
+            {type: 'default', text: 'Share via Telegram', id: 'telegram'},
+            {type: 'cancel', text: 'Cancel'}
+        ]
+    }, (buttonId) => {
+        if (buttonId === 'copy') {
+            copyToClipboard(referralLink);
+        } else if (buttonId === 'telegram') {
+            shareViaTelegram(referralLink);
+        }
+    });
+}
+
+// Copy link to clipboard
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('Link copied to clipboard!');
+    } catch (err) {
+        // Fallback for browsers that don't support clipboard API
         const textArea = document.createElement('textarea');
         textArea.value = text;
         textArea.style.position = 'fixed';
@@ -273,32 +281,23 @@ function copyToClipboard(text) {
 
         try {
             document.execCommand('copy');
-            showToast('Link copied!');
+            showToast('Link copied to clipboard!');
         } catch (error) {
-            showToast('Failed to copy');
+            showToast('Failed to copy link');
         } finally {
-            textArea.remove();
+            document.body.removeChild(textArea);
         }
     }
 }
 
-function shareViaTelegram() {
-    const referralLink = document.getElementById('referralLink').textContent;
+// Share via Telegram
+function shareViaTelegram(link) {
     const text = 'Join using my referral link!';
-    webApp.openTelegramLink(
-        `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`
-    );
+    const url = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+    webApp.openTelegramLink(url);
 }
 
-function startPeriodicUpdates() {
-    setInterval(async () => {
-        if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
-            await fetchUserData();
-            lastUpdate = Date.now();
-        }
-    }, UPDATE_INTERVAL);
-}
-
+// Show toast message
 function showToast(message, duration = 2000) {
     const toast = document.getElementById('toast');
     toast.textContent = message;
@@ -307,6 +306,16 @@ function showToast(message, duration = 2000) {
         toast.style.display = 'none';
     }, duration);
 }
+
+// Handle back button
+webApp.BackButton.onClick(() => {
+    webApp.close();
+});
+
+// Handle theme changes
+webApp.onEvent('themeChanged', () => {
+    document.documentElement.className = webApp.colorScheme;
+});
     </script>
 </body>
 </html>
