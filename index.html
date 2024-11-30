@@ -202,54 +202,59 @@
             }
         }
 
-// Fetch user data from server
+
+// Sửa lại hàm fetchUserData
 async function fetchUserData() {
     try {
+        if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
+            showToast('Could not get user data from Telegram');
+            return;
+        }
+
+        const user = tg.initDataUnsafe.user;
+        console.log("Fetching data for user:", user);  // Debug log
+
         const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
+        console.log("Server response:", response);  // Debug log
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
+        console.log("Received data:", data);  // Debug log
 
         if (data.error) {
             showToast(data.error);
             return;
         }
 
-        // Cập nhật UI với dữ liệu từ server
-        updateStats(data);
-        updateReferralLink(data.bot.username);
-        
-        // Nếu là user mới, hiện thông báo chào mừng
-        if (!data.user || data.user.points === 0) {
-            showToast('Welcome to our referral system!');
-        }
-
-    } catch (error) {
-        showToast('Error connecting to server');
-        console.error('Error:', error);
-    }
-}
-
-// Modify fetchUserData function
-async function fetchUserData() {
-    try {
-        const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
-        const data = await response.json();
-
-        if (data.error) {
-            showToast(data.error);
-            return;
-        }
-
+        // Cập nhật UI
         updateStats(data);
         updateReferralLink(data.bot.username);
         if (data.referrals && data.referrals.list) {
             updateReferralsList(data.referrals.list);
         }
-        
-        lastUpdate = Date.now();
+
     } catch (error) {
-        showToast('Error connecting to server');
-        console.error('Error:', error);
+        console.error('Detailed error:', error);  // Chi tiết lỗi
+        showToast('Error connecting to server: ' + error.message);
     }
+}
+
+// Thêm hàm kiểm tra kết nối
+function checkConnection() {
+    fetch(WEBAPP_URL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            console.log('Connection successful');
+        })
+        .catch(error => {
+            console.error('Connection error:', error);
+            showToast('Server connection error. Please try again later.');
+        });
 }
 
         // Update referral link
