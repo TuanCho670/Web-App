@@ -141,8 +141,8 @@
 
     <script>
         // Constants
-        const WEBAPP_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL';
-        const BOT_USERNAME = 'YOUR_BOT_USERNAME';
+        const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec';
+        const BOT_USERNAME = 'o2penbox_bot';
         const UPDATE_INTERVAL = 5000; // 5 seconds
         
         // Initialize Telegram WebApp
@@ -189,27 +189,56 @@
             }
         }
 
-        async function fetchUserData() {
-            try {
-                const response = await fetch(`${WEBAPP_URL}?userId=${user.id}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+async function fetchUserData() {
+    try {
+        // Log để debug
+        console.log('Fetching data for user:', user.id);
+        console.log('WebApp URL:', WEBAPP_URL);
 
-                const data = await response.json();
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                updateStats(data);
-                updateReferralLink();
-
-            } catch (error) {
-                console.error('Data fetch error:', error);
-                showToast('Error loading user data');
-            }
+        // Kiểm tra URL và user ID
+        if (!WEBAPP_URL || !user.id) {
+            showToast('Invalid configuration');
+            console.error('URL or UserID missing:', { WEBAPP_URL, userId: user.id });
+            return;
         }
 
+        const requestUrl = `${WEBAPP_URL}?userId=${user.id}`;
+        console.log('Request URL:', requestUrl);
+
+        // Thực hiện request với timeout
+        const response = await Promise.race([
+            fetch(requestUrl),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Request timeout')), 10000)
+            )
+        ]);
+
+        console.log('Response status:', response.status);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Received data:', data);
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // Kiểm tra data có đúng format không
+        if (!data.stats) {
+            throw new Error('Invalid data format');
+        }
+
+        updateStats(data);
+        updateReferralLink();
+
+    } catch (error) {
+        console.error('Detailed fetch error:', error);
+        showToast('Error loading user data: ' + error.message);
+    }
+}
         function updateStats(data) {
             document.getElementById('referralCount').textContent = 
                 data.stats.referralCount || 0;
