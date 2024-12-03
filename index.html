@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mời Bạn Bè</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://site-assets.fontawesome.com/releases/v6.7.1/css/all.css">
+    <style>
+ :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-secondary-bg: #f4f4f5;
+            --tg-theme-text-color: #000000;
+            --tg-theme-button-color: #2AABEE;
+            --tg-theme-button-text-color: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color, #fff);
+            color: var(--tg-theme-text-color, #000);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .invite-card {
+            background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            color: white;
+        }
+
+        .gift-icon {
+            font-size: 32px;
+            margin-right: 15px;
+        }
+
+        .invite-info {
+            flex-grow: 1;
+        }
+
+        .invite-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .reward {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+        }
+
+        .share-section {
+            background: var(--tg-theme-secondary-bg);
+            border-radius: 12px;
+            padding: 15px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .share-link {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            position: relative;
+            padding-right: 50px;
+            word-break: break-all;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .copy-button {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #2AABEE;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .copy-button i {
+            margin-right: 5px;
+        }
+
+        .share-button {
+            width: 100%;
+            background: #2AABEE;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .share-button i {
+            margin-right: 8px;
+        }
+
+        .invite-list {
+            margin-top: 20px;
+        }
+
+        .invite-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: var(--tg-theme-secondary-bg);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #2AABEE;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+
+        .user-details .user-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .user-details .invite-date {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .status-completed {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-completed i {
+            margin-right: 4px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: none;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">Mời Bạn Bè</div>
+        
+        <div class="invite-card">
+            <div class="gift-icon">
+                <i class="fa-solid fa-gift"></i>
+            </div>
+            <div class="invite-info">
+                <div class="invite-title">Mời bạn bè</div>
+                <div class="reward">+10,000 điểm cho bạn và người được mời</div>
+            </div>
+        </div>
+
+        <div class="share-section">
+            <div class="share-link">
+                <span id="referralLink">Loading referral link...</span>
+                <button class="copy-button" onclick="copyReferralLink()">
+                    <i class="fa-regular fa-copy"></i>
+                </button>
+            </div>
+            <button class="share-button" onclick="shareReferralLink()">
+                <i class="fa-solid fa-share-nodes"></i>
+                Chia sẻ link
+            </button>
+        </div>
+
+        <div class="invite-list">
+            Danh sách đã mời:
+            <div id="inviteListContent">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Constants
+        const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec';
+        let webApp;
+        let user = null;
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeWebApp();
+        });
+
+        // Initialize Telegram WebApp
+        async function initializeWebApp() {
+            try {
+                webApp = window.Telegram.WebApp;
+                webApp.expand();
+
+                if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
+                    user = webApp.initDataUnsafe.user;
+                    await fetchUserData();
+                } else {
+                    showToast('Could not get user data');
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showToast('Error initializing app');
+            }
+        }
+
+        // Fetch user data from server
+        async function fetchUserData() {
+            try {
+                const queryParams = new URLSearchParams({
+                    userId: user.id,
+                    username: user.username || '',
+                    firstName: user.first_name || '',
+                    lastName: user.last_name || ''
+                });
+
+                const response = await fetch(`${WEBAPP_URL}?${queryParams}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                updateUI(data);
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                showToast('Error loading user data');
+            }
+        }
+
+        // Update UI with data
+        function updateUI(data) {
+            // Update referral link
+            const referralLink = `https://t.me/${data.bot.username}?start=${user.id}`;
+            document.getElementById('referralLink').textContent = referralLink;
+
+            // Update referrals list
+            updateReferralsList(data.referralsList);
+        }
+
+        
+        // Cập nhật hàm updateReferralsList để sử dụng Font Awesome
+        function updateReferralsList(referrals) {
+            const container = document.getElementById('inviteListContent');
+            
+            if (!referrals || referrals.length === 0) {
+                container.innerHTML = `
+                    <div class="invite-item">
+                        <div class="user-info">
+                            <div class="user-avatar">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <div class="user-details">
+                                <div class="user-name">Chưa có người được mời</div>
+                            </div>
+                        </div>
+                    </div>`;
+                return;
+            }
+
+            const html = referrals.map(ref => `
+                <div class="invite-item">
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div class="user-details">
+                            <div class="user-name">${ref.username || `${ref.firstName} ${ref.lastName}`.trim() || 'Anonymous'}</div>
+                            <div class="invite-date">${new Date(ref.joinDate).toLocaleDateString('vi-VN')}</div>
+                        </div>
+                    </div>
+                    <div class="status-completed">
+                        <i class="fa-solid fa-check"></i>
+                        Thành công
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+        }
+
+        // Copy referral link
+        async function copyReferralLink() {
+            const referralLink = document.getElementById('referralLink').textContent;
+            
+            try {
+                await navigator.clipboard.writeText(referralLink);
+                showToast('Đã sao chép link');
+            } catch (err) {
+                // Fallback for browsers that don't support clipboard API
+                const textArea = document.createElement('textarea');
+                textArea.value = referralLink;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                
+                try {
+                    document.execCommand('copy');
+                    showToast('Đã sao chép link');
+                } catch (error) {
+                    showToast('Không thể sao chép');
+                } finally {
+                    document.body.removeChild(textArea);
+                }
+            }
+        }
+
+        // Show toast message
+        function showToast(message, duration = 2000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.display = 'block';
+            
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, duration);
+        }
+
+         // Share referral link
+    function shareReferralLink() {
+        const referralLink = document.getElementById('referralLink').textContent;
+        const text = `Tham gia với link giới thiệu của tôi để nhận 10,000 điểm!`;
+        
+        if (webApp.platform === 'android' || webApp.platform === 'ios') {
+            // Sử dụng native sharing trên mobile
+            webApp.shareUrl(referralLink);
+        } else {
+            // Sử dụng sharing của Telegram
+            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`;
+            webApp.openTelegramLink(shareUrl);
+        }
+    }
+
+    // Cập nhật hàm initializeWebApp để set theme
+    function initializeWebApp() {
+        try {
+            webApp = window.Telegram.WebApp;
+            webApp.expand();
+            
+            // Set theme
+            document.documentElement.className = webApp.colorScheme;
+            
+            if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
+                user = webApp.initDataUnsafe.user;
+                fetchUserData();
+            } else {
+                showToast('Could not get user data');
+            }
+        } catch (error) {
+            console.error('Initialization error:', error);
+            showToast('Error initializing app');
+        }
+    }
+    </script>
+</body>
+</html>
