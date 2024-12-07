@@ -302,6 +302,7 @@
 let webApp;
 let user = null;
 
+        
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     initializeWebApp();
@@ -326,6 +327,47 @@ async function initializeWebApp() {
     } catch (error) {
         console.error('Initialization error:', error);
         showToast('Error initializing app');
+    }
+}
+
+        function updateUserInterface() {
+    if (!user) return;
+
+    // Cập nhật thông tin người dùng nếu có các element tương ứng
+    if (document.getElementById('userName')) {
+        document.getElementById('userName').textContent = 
+            `${user.first_name} ${user.last_name || ''}`;
+    }
+
+    if (document.getElementById('userUsername')) {
+        document.getElementById('userUsername').textContent = 
+            user.username ? `@${user.username}` : '';
+    }
+
+    if (document.getElementById('userPhoto')) {
+        const photoElement = document.getElementById('userPhoto');
+        if (user.photo_url) {
+            photoElement.src = user.photo_url;
+        } else {
+            // Nếu không có ảnh, có thể set ảnh mặc định
+            photoElement.src = 'default-avatar.png';
+        }
+    }
+
+    // Update referral link nếu đã có bot username
+    if (BOT_USERNAME) {
+        const referralLink = `https://t.me/${BOT_USERNAME}?start=${user.id}`;
+        if (document.getElementById('referralLink')) {
+            document.getElementById('referralLink').textContent = referralLink;
+        }
+    }
+
+    // Reset các giá trị số liệu về 0
+    if (document.getElementById('referralCount')) {
+        document.getElementById('referralCount').textContent = '0';
+    }
+    if (document.getElementById('pointsCount')) {
+        document.getElementById('pointsCount').textContent = '0';
     }
 }
 
