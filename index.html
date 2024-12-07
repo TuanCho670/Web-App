@@ -233,35 +233,47 @@
     </div>
 
     <div class="toast" id="toast"></div>
-
+<!-- Thêm vào cuối body trước </body> -->
+<div class="popup-overlay" id="successPopup">
+    <div class="popup">
+        <div class="popup-icon">🎉</div>
+        <div class="popup-title">Chúc mừng!</div>
+        <div class="popup-message" id="popupMessage"></div>
+        <button class="popup-button" onclick="closePopup()">OK</button>
+    </div>
+</div>
     <script>
         // Constants
         const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec';
         let webApp;
         let user = null;
+        let lastCheckTime = 0;
+        const CHECK_INTERVAL = 3000; // Kiểm tra mỗi 3 giây
 
         // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
             initializeWebApp();
         });
 
-        // Initialize Telegram WebApp
-        async function initializeWebApp() {
-            try {
-                webApp = window.Telegram.WebApp;
-                webApp.expand();
+       async function initializeWebApp() {
+    try {
+        webApp = window.Telegram.WebApp;
+        webApp.expand();
 
-                if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
-                    user = webApp.initDataUnsafe.user;
-                    await fetchUserData();
-                } else {
-                    showToast('Could not get user data');
-                }
-            } catch (error) {
-                console.error('Initialization error:', error);
-                showToast('Error initializing app');
-            }
+        if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
+            user = webApp.initDataUnsafe.user;
+            await fetchUserData();
+            
+            // Start checking for updates
+            setInterval(checkForUpdates, CHECK_INTERVAL);
+        } else {
+            showToast('Could not get user data');
         }
+    } catch (error) {
+        console.error('Initialization error:', error);
+        showToast('Error initializing app');
+    }
+}
 
         // Fetch user data from server
         async function fetchUserData() {
@@ -298,6 +310,45 @@
             updateReferralsList(data.referralsList);
         }
 
+        function showSuccessPopup(message) {
+    document.getElementById('popupMessage').innerHTML = message;
+    document.getElementById('successPopup').style.display = 'block';
+}
+
+function closePopup() {
+    document.getElementById('successPopup').style.display = 'none';
+}
+
+async function checkForUpdates() {
+    try {
+        const response = await fetch(`${WEBAPP_URL}?userId=${user.id}&checkUpdates=true`);
+        const data = await response.json();
+
+        if (data.newReferral) {
+            // Người giới thiệu thành công
+            showSuccessPopup(`
+                Bạn đã giới thiệu thành công!<br><br>
+                Nhận được: <b>10,000 điểm</b><br>
+                Tổng điểm hiện tại: <b>${data.user.points.toLocaleString('vi-VN')}</b>
+            `);
+            updateStats(data.stats);
+        }
+
+        if (data.wasReferred) {
+            // Người được giới thiệu
+            showSuccessPopup(`
+                Chào mừng bạn đến với bot!<br><br>
+                Bạn nhận được: <b>10,000 điểm</b><br>
+                từ người giới thiệu
+            `);
+            updateStats(data.stats);
+        }
+
+    } catch (error) {
+        console.error('Error checking updates:', error);
+    }
+}
+        
         
         // Cập nhật hàm updateReferralsList để sử dụng Font Awesome
         function updateReferralsList(referrals) {
