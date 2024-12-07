@@ -131,42 +131,26 @@
         }
 
         .invite-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: var(--tg-theme-secondary-bg);
-            border-radius: 8px;
-            margin-bottom: 8px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-        }
+    background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+}
 
-        .user-info {
-            display: flex;
-            align-items: center;
-        }
+.user-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #2AABEE;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 12px;
-        }
+.user-name {
+    font-weight: 500;
+}
 
-        .user-details .user-name {
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-
-        .user-details .invite-date {
-            font-size: 12px;
-            color: #666;
-        }
+.invite-date {
+    color: var(--tg-theme-hint-color, #999);
+    font-size: 12px;
+}
 
         .status-completed {
             background: #e8f5e9;
@@ -494,7 +478,7 @@ function setupMainButton() {
             if (buttonId === 'copy') {
                 copyReferralLink();
             } else if (buttonId === 'telegram') {
-                const text = 'Join using my referral link!';
+                const text = 'Tham gia với link giới thiệu của tôi để nhận 10,000 điểm!';
                 webApp.openTelegramLink(
                     `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`
                 );
