@@ -299,27 +299,27 @@
     <script>
         // Constants
         const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec';
-        let webApp;
-        let user = null;
-        let lastCheckTime = 0;
-        const CHECK_INTERVAL = 3000; // Kiểm tra mỗi 3 giây
+let webApp;
+let user = null;
 
-        // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeWebApp();
-        });
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    initializeWebApp();
+});
 
-       async function initializeWebApp() {
+// Initialize Telegram WebApp
+async function initializeWebApp() {
     try {
         webApp = window.Telegram.WebApp;
         webApp.expand();
-
+        
         if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
             user = webApp.initDataUnsafe.user;
+            console.log('User data:', user);
+            updateUserInterface();
             await fetchUserData();
-            
-            // Start checking for updates
-            setInterval(checkForUpdates, CHECK_INTERVAL);
+            setupMainButton();
+            startPeriodicUpdates();
         } else {
             showToast('Could not get user data');
         }
@@ -329,9 +329,13 @@
     }
 }
 
-        // Fetch user data from server
-        async function fetchUserData() {
-  try {
+// Fetch user data using no-cors mode
+async function fetchUserData() {
+    try {
+        if (!user || !user.id) {
+            throw new Error('Invalid user data');
+        }
+
         const queryParams = new URLSearchParams({
             userId: user.id,
             username: user.username || '',
@@ -339,38 +343,56 @@
             lastName: user.last_name || ''
         });
 
-        const response = await fetch(`${WEBAPP_URL}?${queryParams}`, {
+        await fetch(`${WEBAPP_URL}?${queryParams}`, {
             method: 'GET',
-            mode: 'cors',  // Add this
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            mode: 'no-cors'
         });
-                const data = await response.json();
 
-                if (data.error) {
-                    throw new Error(data.error);
-                }
+        // Vì no-cors không cho phép đọc response, 
+        // chúng ta sẽ dựa vào periodic updates để cập nhật UI
+        startPeriodicUpdates();
 
-                updateUI(data);
-
-            } catch (error) {
+    } catch (error) {
         console.error('Error fetching data:', error);
         showToast('Error loading user data');
-            }
-        }
+    }
+}
 
-        // Update UI with data
-        function updateUI(data) {
-            // Update referral link
-            const referralLink = `https://t.me/${data.bot.username}?start=${user.id}`;
-            document.getElementById('referralLink').textContent = referralLink;
+// Check for updates periodically
+function startPeriodicUpdates() {
+    setInterval(checkForUpdates, 3000); // Check every 3 seconds
+}
 
-            // Update referrals list
-            updateReferralsList(data.referralsList);
-        }
+async function checkForUpdates() {
+    try {
+        const response = await fetch(`${WEBAPP_URL}?userId=${user.id}&checkUpdates=true`, {
+            method: 'GET',
+            mode: 'no-cors'
+        });
 
-        function showSuccessPopup(message) {
+        // Instead of reading response, update UI based on local data
+        updateUI();
+
+    } catch (error) {
+        console.error('Error checking updates:', error);
+    }
+}
+
+function updateUI() {
+    // Update referral link
+    const referralLink = `https://t.me/${BOT_USERNAME}?start=${user.id}`;
+    document.getElementById('referralLink').textContent = referralLink;
+
+    // Update points and referrals from local storage if available
+    const localData = localStorage.getItem('userData');
+    if (localData) {
+        const data = JSON.parse(localData);
+        document.getElementById('pointsCount').textContent = data.points || 0;
+        document.getElementById('referralCount').textContent = data.referrals || 0;
+    }
+}
+
+function showSuccessPopup(message) {
     document.getElementById('popupMessage').innerHTML = message;
     document.getElementById('successPopup').style.display = 'block';
 }
@@ -379,155 +401,65 @@ function closePopup() {
     document.getElementById('successPopup').style.display = 'none';
 }
 
-async function checkForUpdates() {
-   try {
-        const response = await fetch(`${WEBAPP_URL}?userId=${user.id}&checkUpdates=true`, {
-            method: 'GET',
-            mode: 'cors',
-            headers: {
-                'Content-Type': 'application/json'
+function copyReferralLink() {
+    const referralLink = document.getElementById('referralLink').textContent;
+    navigator.clipboard.writeText(referralLink)
+        .then(() => showToast('Link copied!'))
+        .catch(() => {
+            // Fallback for clipboard API
+            const textArea = document.createElement('textarea');
+            textArea.value = referralLink;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast('Link copied!');
+            } catch (error) {
+                showToast('Failed to copy link');
+            } finally {
+                document.body.removeChild(textArea);
             }
         });
-
-        if (data.newReferral) {
-            // Người giới thiệu thành công
-            showSuccessPopup(`
-                Bạn đã giới thiệu thành công!<br><br>
-                Nhận được: <b>10,000 điểm</b><br>
-                Tổng điểm hiện tại: <b>${data.user.points.toLocaleString('vi-VN')}</b>
-            `);
-            updateStats(data.stats);
-        }
-
-        if (data.wasReferred) {
-            // Người được giới thiệu
-            showSuccessPopup(`
-                Chào mừng bạn đến với bot!<br><br>
-                Bạn nhận được: <b>10,000 điểm</b><br>
-                từ người giới thiệu
-            `);
-            updateStats(data.stats);
-        }
-
-    } catch (error) {
-        console.error('Error checking updates:', error);
-    }
 }
-        
-        
-        // Cập nhật hàm updateReferralsList để sử dụng Font Awesome
-        function updateReferralsList(referrals) {
-            const container = document.getElementById('inviteListContent');
-            
-            if (!referrals || referrals.length === 0) {
-                container.innerHTML = `
-                    <div class="invite-item">
-                        <div class="user-info">
-                            <div class="user-avatar">
-                                <i class="fa-solid fa-user"></i>
-                            </div>
-                            <div class="user-details">
-                                <div class="user-name">Chưa có người được mời</div>
-                            </div>
-                        </div>
-                    </div>`;
-                return;
-            }
 
-            const html = referrals.map(ref => `
-                <div class="invite-item">
-                    <div class="user-info">
-                        <div class="user-avatar">
-                            <i class="fa-solid fa-user"></i>
-                        </div>
-                        <div class="user-details">
-                            <div class="user-name">${ref.username || `${ref.firstName} ${ref.lastName}`.trim() || 'Anonymous'}</div>
-                            <div class="invite-date">${new Date(ref.joinDate).toLocaleDateString('vi-VN')}</div>
-                        </div>
-                    </div>
-                    <div class="status-completed">
-                        <i class="fa-solid fa-check"></i>
-                        Thành công
-                    </div>
-                </div>
-            `).join('');
+function showToast(message, duration = 2000) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.display = 'block';
+    setTimeout(() => {
+        toast.style.display = 'none';
+    }, duration);
+}
 
-            container.innerHTML = html;
-        }
-
-        // Copy referral link
-        async function copyReferralLink() {
-            const referralLink = document.getElementById('referralLink').textContent;
-            
-            try {
-                await navigator.clipboard.writeText(referralLink);
-                showToast('Đã sao chép link');
-            } catch (err) {
-                // Fallback for browsers that don't support clipboard API
-                const textArea = document.createElement('textarea');
-                textArea.value = referralLink;
-                textArea.style.position = 'fixed';
-                textArea.style.opacity = '0';
-                document.body.appendChild(textArea);
-                textArea.select();
-                
-                try {
-                    document.execCommand('copy');
-                    showToast('Đã sao chép link');
-                } catch (error) {
-                    showToast('Không thể sao chép');
-                } finally {
-                    document.body.removeChild(textArea);
-                }
-            }
-        }
-
-        // Show toast message
-        function showToast(message, duration = 2000) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.style.display = 'block';
-            
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, duration);
-        }
-
-         // Share referral link
-    function shareReferralLink() {
+// Setup main button
+function setupMainButton() {
+    const mainButton = webApp.MainButton;
+    mainButton.setText('Share Link');
+    mainButton.onClick(() => {
         const referralLink = document.getElementById('referralLink').textContent;
-        const text = `Tham gia với link giới thiệu của tôi để nhận 10,000 điểm!`;
-        
-        if (webApp.platform === 'android' || webApp.platform === 'ios') {
-            // Sử dụng native sharing trên mobile
-            webApp.shareUrl(referralLink);
-        } else {
-            // Sử dụng sharing của Telegram
-            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`;
-            webApp.openTelegramLink(shareUrl);
-        }
-    }
-
-    // Cập nhật hàm initializeWebApp để set theme
-    function initializeWebApp() {
-        try {
-            webApp = window.Telegram.WebApp;
-            webApp.expand();
-            
-            // Set theme
-            document.documentElement.className = webApp.colorScheme;
-            
-            if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
-                user = webApp.initDataUnsafe.user;
-                fetchUserData();
-            } else {
-                showToast('Could not get user data');
+        webApp.showPopup({
+            title: 'Share Referral Link',
+            message: 'Choose how to share your link:',
+            buttons: [
+                {type: 'default', text: 'Copy Link', id: 'copy'},
+                {type: 'default', text: 'Share via Telegram', id: 'telegram'},
+                {type: 'cancel', text: 'Cancel'}
+            ]
+        }, (buttonId) => {
+            if (buttonId === 'copy') {
+                copyReferralLink();
+            } else if (buttonId === 'telegram') {
+                const text = 'Join using my referral link!';
+                webApp.openTelegramLink(
+                    `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`
+                );
             }
-        } catch (error) {
-            console.error('Initialization error:', error);
-            showToast('Error initializing app');
-        }
-    }
+        });
+    });
+    mainButton.show();
+}
     </script>
 </body>
 </html>
