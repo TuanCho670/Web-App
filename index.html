@@ -273,14 +273,7 @@
 
     <div class="toast" id="toast"></div>
 <!-- Thêm vào cuối body trước </body> -->
-<div class="popup-overlay" id="successPopup">
-    <div class="popup">
-        <div class="popup-icon">🎉</div>
-        <div class="popup-title">Chúc mừng!</div>
-        <div class="popup-message" id="popupMessage"></div>
-        <button class="popup-button" onclick="closePopup()">OK</button>
-    </div>
-</div>
+
     <script>
         // Constants
         const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx_D49HB9sw9PGWhIalFVh9mkC_UywgbVybmTmny4xu1-nRZgAQtVGFZF4RSYHFPdI3iQ/exec';
@@ -295,10 +288,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     initializeWebApp();
 });
-
-// Thêm biến để kiểm soát phân trang
-let currentPage = 0;
-const itemsPerPage = 3;
 
 // Thêm HTML cho popup
 function addReferralPopupHTML() {
