@@ -427,13 +427,20 @@ function closeReferralPopup() {
     document.getElementById('referralPopup').style.display = 'none';
 }
 
-// Hàm cập nhật danh sách
 function updateReferralsList() {
+    console.log("Updating referrals list..."); // Debug log
+    
     const localData = localStorage.getItem('userData');
-    if (!localData) return;
+    if (!localData) {
+        console.log("No local data found"); // Debug log
+        return;
+    }
 
     const data = JSON.parse(localData);
+    console.log("Local data:", data); // Debug log
+    
     const referrals = data.referralsList || [];
+    console.log("Referrals:", referrals); // Debug log
     
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
@@ -446,22 +453,27 @@ function updateReferralsList() {
         return;
     }
 
-    container.innerHTML = pageReferrals.map(ref => `
-        <div class="referral-item">
-            <div class="user-info">
-                <div class="user-name">${ref.username || `${ref.firstName} ${ref.lastName}`.trim()}</div>
-                <div class="invite-date">${new Date(ref.joinDate).toLocaleDateString('vi-VN')}</div>
+    container.innerHTML = pageReferrals.map(ref => {
+        // Kiểm tra và xử lý dữ liệu
+        const displayName = ref.username || `${ref.firstName || ''} ${ref.lastName || ''}`.trim() || 'Người dùng';
+        const joinDate = ref.joinDate ? new Date(ref.joinDate).toLocaleDateString('vi-VN') : 'N/A';
+        
+        return `
+            <div class="referral-item">
+                <div class="user-info">
+                    <div class="user-name">${displayName}</div>
+                    <div class="invite-date">${joinDate}</div>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 
-    // Cập nhật nút phân trang
+    // Cập nhật phân trang
     const totalPages = Math.ceil(referrals.length / itemsPerPage);
     document.getElementById('pageInfo').textContent = `Trang ${currentPage + 1}/${totalPages}`;
     document.getElementById('prevBtn').disabled = currentPage === 0;
     document.getElementById('nextBtn').disabled = currentPage >= totalPages - 1;
 }
-
 // Hàm chuyển trang
 function previousPage() {
     if (currentPage > 0) {
@@ -548,13 +560,9 @@ function initializeWebApp() {
     }
 }
 
-// Fetch user data using no-cors mode
+// Sửa lại phần lưu dữ liệu khi fetch
 async function fetchUserData() {
     try {
-        if (!user || !user.id) {
-            throw new Error('Invalid user data');
-        }
-
         const queryParams = new URLSearchParams({
             userId: user.id,
             username: user.username || '',
@@ -562,15 +570,23 @@ async function fetchUserData() {
             lastName: user.last_name || ''
         });
 
-        await fetch(`${WEBAPP_URL}?${queryParams}`, {
+        const response = await fetch(`${WEBAPP_URL}?${queryParams}`, {
             method: 'GET',
             mode: 'no-cors'
         });
 
-        // Vì no-cors không cho phép đọc response, 
-        // chúng ta sẽ dựa vào periodic updates để cập nhật UI
-        startPeriodicUpdates();
+        // Lưu dữ liệu giả lập vì không thể đọc response với no-cors
+        const mockData = {
+            user: {
+                points: 0,
+                referrals: 0
+            },
+            referralsList: [] // Sẽ được cập nhật từ periodic updates
+        };
+        localStorage.setItem('userData', JSON.stringify(mockData));
 
+        startPeriodicUpdates();
+        
     } catch (error) {
         console.error('Error fetching data:', error);
         showToast('Error loading user data');
