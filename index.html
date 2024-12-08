@@ -267,6 +267,7 @@
             <div id="inviteListContent">
                 Loading...
             </div>
+            <button class="button" onclick="showReferralPopup()">Xem danh sách đã mời</button>
         </div>
     </div>
 
@@ -286,6 +287,8 @@
         let webApp;
         let user = null;
         const BOT_USERNAME = 'o2penbox_bot';
+        let currentPage = 0;
+        const itemsPerPage = 3;
 
         
 // Initialize when DOM is ready
@@ -293,19 +296,216 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeWebApp();
 });
 
-// Initialize Telegram WebApp
-async function initializeWebApp() {
+// Thêm biến để kiểm soát phân trang
+let currentPage = 0;
+const itemsPerPage = 3;
+
+// Thêm HTML cho popup
+function addReferralPopupHTML() {
+    const popupHTML = `
+        <div id="referralPopup" class="popup-overlay" style="display: none;">
+            <div class="popup">
+                <div class="popup-header">
+                    <h3>Danh sách đã mời</h3>
+                    <button class="close-btn" onclick="closeReferralPopup()">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div id="referralListContent" class="popup-content">
+                    <!-- Danh sách sẽ được thêm vào đây -->
+                </div>
+                <div class="popup-pagination">
+                    <button onclick="previousPage()" class="pagination-btn" id="prevBtn">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <span id="pageInfo">Trang 1</span>
+                    <button onclick="nextPage()" class="pagination-btn" id="nextBtn">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', popupHTML);
+}
+
+// Thêm CSS cho popup
+const popupStyles = `
+    .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+
+    .popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--tg-theme-bg-color, white);
+        border-radius: 12px;
+        width: 90%;
+        max-width: 360px;
+        max-height: 80vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .popup-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.1));
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .popup-header h3 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .close-btn {
+        background: none;
+        border: none;
+        color: var(--tg-theme-hint-color, #999);
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px;
+    }
+
+    .popup-content {
+        padding: 16px;
+        overflow-y: auto;
+        flex-grow: 1;
+    }
+
+    .referral-item {
+        padding: 12px;
+        background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+        border-radius: 8px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .popup-pagination {
+        padding: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid var(--tg-theme-hint-color, rgba(0,0,0,0.1));
+    }
+
+    .pagination-btn {
+        background: var(--tg-theme-button-color, #2481cc);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        cursor: pointer;
+    }
+
+    .pagination-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+`;
+
+// Thêm style vào head
+function addStyles() {
+    const styleSheet = document.createElement("style");
+    styleSheet.textContent = popupStyles;
+    document.head.appendChild(styleSheet);
+}
+
+// Hàm hiển thị popup
+function showReferralPopup() {
+    currentPage = 0;
+    updateReferralsList();
+    document.getElementById('referralPopup').style.display = 'block';
+}
+
+// Hàm đóng popup
+function closeReferralPopup() {
+    document.getElementById('referralPopup').style.display = 'none';
+}
+
+// Hàm cập nhật danh sách
+function updateReferralsList() {
+    const localData = localStorage.getItem('userData');
+    if (!localData) return;
+
+    const data = JSON.parse(localData);
+    const referrals = data.referralsList || [];
+    
+    const start = currentPage * itemsPerPage;
+    const end = start + itemsPerPage;
+    const pageReferrals = referrals.slice(start, end);
+    
+    const container = document.getElementById('referralListContent');
+    
+    if (referrals.length === 0) {
+        container.innerHTML = '<div class="referral-item">Chưa có người được mời</div>';
+        return;
+    }
+
+    container.innerHTML = pageReferrals.map(ref => `
+        <div class="referral-item">
+            <div class="user-info">
+                <div class="user-name">${ref.username || `${ref.firstName} ${ref.lastName}`.trim()}</div>
+                <div class="invite-date">${new Date(ref.joinDate).toLocaleDateString('vi-VN')}</div>
+            </div>
+        </div>
+    `).join('');
+
+    // Cập nhật nút phân trang
+    const totalPages = Math.ceil(referrals.length / itemsPerPage);
+    document.getElementById('pageInfo').textContent = `Trang ${currentPage + 1}/${totalPages}`;
+    document.getElementById('prevBtn').disabled = currentPage === 0;
+    document.getElementById('nextBtn').disabled = currentPage >= totalPages - 1;
+}
+
+// Hàm chuyển trang
+function previousPage() {
+    if (currentPage > 0) {
+        currentPage--;
+        updateReferralsList();
+    }
+}
+
+function nextPage() {
+    const localData = JSON.parse(localStorage.getItem('userData'));
+    const totalPages = Math.ceil((localData?.referralsList?.length || 0) / itemsPerPage);
+    
+    if (currentPage < totalPages - 1) {
+        currentPage++;
+        updateReferralsList();
+    }
+}
+
+// Thêm vào hàm initializeWebApp
+function initializeWebApp() {
     try {
         webApp = window.Telegram.WebApp;
         webApp.expand();
         
+        // Thêm popup và styles
+        addReferralPopupHTML();
+        addStyles();
+        
         if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
             user = webApp.initDataUnsafe.user;
-            console.log('User data:', user);
             updateUserInterface();
-            await fetchUserData();
+            fetchUserData();
             setupMainButton();
-            startPeriodicUpdates();
         } else {
             showToast('Could not get user data');
         }
@@ -314,6 +514,9 @@ async function initializeWebApp() {
         showToast('Error initializing app');
     }
 }
+
+// Sửa lại nút xem danh sách trong HTML
+// <button class="button" onclick="showReferralPopup()">Xem danh sách đã mời</button>
 
         function updateUserInterface() {
     if (!user) return;
