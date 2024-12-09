@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Lookup Tool</title>
     <style>
-        /* CSS giữ nguyên */
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -70,6 +69,48 @@
             color: red;
             margin-top: 10px;
         }
+
+        .user-info {
+            padding: 15px;
+            background: #fff;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .user-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background-color: #e0e0e0;
+            margin-bottom: 10px;
+        }
+
+        .status-success {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .status-error {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        .user-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .user-details {
+            display: grid;
+            gap: 8px;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -99,20 +140,39 @@
             `;
         }
         
-        function displayUserInfo(data) {
-            if (data.error) {
-                showError(data.error);
+        function displayUserInfo(response) {
+            const resultDiv = document.getElementById('result');
+            
+            if (response.code !== 0) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <div>Mã lỗi: ${response.code}</div>
+                        <div>Thông báo: ${response.msg}</div>
+                    </div>
+                `;
                 return;
             }
+
+            const userInfo = response.data;
+            const statusClass = response.status === 200 ? 'status-success' : 'status-error';
             
-            const userInfo = data.data || data;
-            document.getElementById('result').innerHTML = `
-                <div>
-                    <div><strong>User ID:</strong> ${userInfo.uid || 'N/A'}</div>
-                    <div><strong>Username:</strong> ${userInfo.username || 'N/A'}</div>
-                    <div><strong>Email:</strong> ${userInfo.email || 'N/A'}</div>
-                    <div><strong>Trạng thái:</strong> ${userInfo.status || 'N/A'}</div>
-                    <div><strong>Ngày tạo:</strong> ${userInfo.created_at || 'N/A'}</div>
+            resultDiv.innerHTML = `
+                <div class="user-info">
+                    <div class="user-header">
+                        <div class="user-avatar"></div>
+                        <div>
+                            <h3 style="margin: 0">${userInfo.nickname}</h3>
+                            <div>ID: ${userInfo.uid}</div>
+                        </div>
+                    </div>
+                    <div class="user-details">
+                        <div><span class="label">Avatar:</span> ${userInfo.avatar}</div>
+                        <div><span class="label">Status:</span> <span class="${statusClass}">${response.msg}</span></div>
+                        <div><span class="label">Runtime:</span> ${response.runtime}s</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; font-size: 12px; color: #666;">
+                    Raw Response: <pre>${JSON.stringify(response, null, 2)}</pre>
                 </div>
             `;
         }
@@ -134,10 +194,9 @@
             
             showLoading(true);
             
-            // Tạo script element để load JSONP
             const script = document.createElement('script');
             // Thay YOUR_APPS_SCRIPT_URL bằng URL thực của bạn
-            script.src = `https://script.google.com/macros/s/AKfycbzjWbvtPTgKWYMBW3dNcosfag6YKd_-XEoG8AQr6FeMZWeRzOE1LKnWLEnWsAHr3vu6JA/exec?uid=${uid}&callback=jsonpCallback`;
+            script.src = `https://script.googleusercontent.com/macros/echo?user_content_key=Fh5LQIs8ODXys3dHdaJSK0679hv_HJPyS2gLjWCDRhcMaEmR7PibxL70AConqkrGoGqjOdb_cL9fJz_kO2ANlfEYqCVgbLAIm5_BxDlH2jW0nuo2oDemN9CCS2h10ox_1xSncGQajx_ryfhECjZEnCucb4lXB6nsh2IdfK1eItVRPg7mGoau4pj81DckE6x9nZScPIEg-QglUW5H7PWWjOAezObMW0_bPcvEqSACXU7igyrcJu19Rtz9Jw9Md8uu&lib=MnsUWa81H7gOM7ZydBWTQxlmtFonAWTUP?uid=${uid}&callback=jsonpCallback`;
             script.onerror = () => {
                 showLoading(false);
                 showError('Không thể kết nối đến server');
