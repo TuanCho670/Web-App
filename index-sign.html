@@ -146,9 +146,9 @@
         }
 
         function getAvatarPath(avatarString) {
-            // Chuyển đổi "default:42" thành "big_player_head_42.jpg"
+            // Chuyển đổi "default:42" thành "player_head_42.jpg"
             const avatarId = avatarString.split(':')[1];
-            return `./assets/big_player_head_${avatarId}.jpg`;
+            return `./assets/player_head_${avatarId}.jpg`;
         }
         
         function displayUserInfo(response) {
