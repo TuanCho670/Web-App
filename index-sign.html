@@ -196,7 +196,7 @@
             
             const script = document.createElement('script');
             // Thay YOUR_APPS_SCRIPT_URL bằng URL thực của bạn
-            script.src = `https://script.googleusercontent.com/macros/echo?user_content_key=Fh5LQIs8ODXys3dHdaJSK0679hv_HJPyS2gLjWCDRhcMaEmR7PibxL70AConqkrGoGqjOdb_cL9fJz_kO2ANlfEYqCVgbLAIm5_BxDlH2jW0nuo2oDemN9CCS2h10ox_1xSncGQajx_ryfhECjZEnCucb4lXB6nsh2IdfK1eItVRPg7mGoau4pj81DckE6x9nZScPIEg-QglUW5H7PWWjOAezObMW0_bPcvEqSACXU7igyrcJu19Rtz9Jw9Md8uu&lib=MnsUWa81H7gOM7ZydBWTQxlmtFonAWTUP?uid=${uid}&callback=jsonpCallback`;
+            script.src = `https://script.google.com/macros/s/AKfycbzjWbvtPTgKWYMBW3dNcosfag6YKd_-XEoG8AQr6FeMZWeRzOE1LKnWLEnWsAHr3vu6JA/exec?uid=${uid}&callback=jsonpCallback`;
             script.onerror = () => {
                 showLoading(false);
                 showError('Không thể kết nối đến server');
