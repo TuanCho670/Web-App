@@ -63,6 +63,7 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             background-color: #f9f9f9;
+            word-wrap: break-word;
         }
         
         .loading {
@@ -89,14 +90,40 @@
             display: inline-block;
             width: 120px;
         }
+
+        .tabs {
+            margin-bottom: 20px;
+        }
+
+        .tab-button {
+            padding: 8px 16px;
+            margin-right: 8px;
+            background-color: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>User Lookup Tool</h2>
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('direct')" id="directTab">Trực tiếp</button>
+            <button class="tab-button" onclick="switchTab('jsonp')" id="jsonpTab">JSONP</button>
+        </div>
         <div class="form-group">
             <label for="uid">User ID:</label>
             <input type="number" id="uid" placeholder="Enter user ID">
+        </div>
+        <div class="form-group">
+            <label for="script-url">Apps Script URL:</label>
+            <input type="text" id="script-url" placeholder="Enter your Apps Script URL">
         </div>
         <button onclick="lookupUser()" id="submitBtn">Look up User</button>
         <div id="loading" class="loading">Loading...</div>
@@ -104,11 +131,15 @@
     </div>
 
     <script>
-        // Thay đổi URL này thành URL của Apps Script web app sau khi deploy
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzjWbvtPTgKWYMBW3dNcosfag6YKd_-XEoG8AQr6FeMZWeRzOE1LKnWLEnWsAHr3vu6JA/exec';
-        
+        let currentTab = 'direct';
         let isLoading = false;
         
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`${tab}Tab`).classList.add('active');
+        }
+
         function setLoading(loading) {
             isLoading = loading;
             document.getElementById('loading').style.display = loading ? 'block' : 'none';
@@ -135,25 +166,79 @@
                     <div><span class="label">Email:</span> ${userInfo.email || 'N/A'}</div>
                     <div><span class="label">Status:</span> ${userInfo.status || 'N/A'}</div>
                     <div><span class="label">Created:</span> ${userInfo.created_at || 'N/A'}</div>
+                    <div><span class="label">Raw Response:</span><br><pre>${JSON.stringify(data, null, 2)}</pre></div>
                 </div>
             `;
+        }
+
+        // Hàm tạo JSONP callback
+        function jsonpCallback(data) {
+            setLoading(false);
+            displayUserInfo(data);
+        }
+
+        // Hàm gọi API với JSONP
+        function fetchWithJsonp(url) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                const callbackName = 'jsonpCallback';
+                window[callbackName] = (data) => {
+                    delete window[callbackName];
+                    document.head.removeChild(script);
+                    resolve(data);
+                };
+                script.src = `${url}&callback=${callbackName}`;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
         }
         
         async function lookupUser() {
             if (isLoading) return;
             
             const uid = document.getElementById('uid').value;
+            const scriptUrl = document.getElementById('script-url').value;
+
             if (!uid) {
                 displayError('Please enter a user ID');
+                return;
+            }
+
+            if (!scriptUrl) {
+                displayError('Please enter the Apps Script URL');
                 return;
             }
             
             setLoading(true);
             
             try {
-                const response = await fetch(`${APPS_SCRIPT_URL}?uid=${uid}`);
-                const data = await response.json();
-                displayUserInfo(data);
+                if (currentTab === 'direct') {
+                    // Phương thức 1: Fetch với no-cors
+                    const response = await fetch(`${scriptUrl}?uid=${uid}`, {
+                        method: 'GET',
+                        mode: 'no-cors',
+                        headers: {
+                            'Content-Type': 'text/plain'
+                        }
+                    });
+                    
+                    // Vì mode no-cors, chúng ta không thể đọc response
+                    // Thay vào đó hiển thị thông báo cho user
+                    document.getElementById('result').innerHTML = `
+                        <div>Request sent successfully!</div>
+                        <div style="margin-top: 10px">
+                            <strong>Note:</strong> Due to CORS restrictions, we cannot display the response directly.
+                            Please check your Apps Script logs or modify the response handling in your Apps Script.
+                        </div>
+                        <div style="margin-top: 10px">
+                            <strong>Request URL:</strong><br>
+                            ${scriptUrl}?uid=${uid}
+                        </div>
+                    `;
+                } else {
+                    // Phương thức 2: JSONP
+                    await fetchWithJsonp(`${scriptUrl}?uid=${uid}`);
+                }
             } catch (error) {
                 displayError(error.message || 'Failed to lookup user');
             } finally {
