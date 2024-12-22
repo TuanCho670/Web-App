@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Golden Mahjong Arena Slot</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+<body>
+    <div id="game-container"></div>
+    <script>
+class MahjongSlot {
+    constructor() {
+        this.app = new PIXI.Application({
+            width: 800,
+            height: 600,
+            backgroundColor: 0x1099bb
+        });
+        document.getElementById('game-container').appendChild(this.app.view);
+
+        this.loadAssets().then(() => {
+            this.createSpritesFromAtlas();
+        });
+    }
+
+    async loadAssets() {
+        try {
+            this.symbolsTexture = await PIXI.Assets.load('https://tuancho670.github.io/TelegramWeb/Symbols@2x2.webp');
+            console.log("Texture loaded successfully");
+        } catch (error) {
+            console.error("Failed to load texture:", error);
+        }
+    }
+
+    createSpritesFromAtlas() {
+    if (!this.symbolsTexture) {
+        console.error("Texture not loaded");
+        return;
+    }
+
+    const textureWidth = this.symbolsTexture.width;
+    const textureHeight = this.symbolsTexture.height;
+
+    const atlasData = [
+        { name: "3Tong_G", rotate: false, xy: [742, 437], size: [102, 123] },
+        { name: "3Tong_N", rotate: true, xy: [127, 2], size: [123, 102] },
+        // Thêm các sprite khác tương tự
+    ];
+
+    atlasData.forEach(data => {
+        const scaleX = textureWidth / 1082; // Cân chỉnh tỉ lệ
+        const scaleY = textureHeight / 562;
+
+        const x = Math.floor(data.xy[0] * scaleX);
+        const y = Math.floor(data.xy[1] * scaleY);
+        const width = Math.floor(data.size[0] * scaleX);
+        const height = Math.floor(data.size[1] * scaleY);
+
+        const safeX = Math.min(x, textureWidth - width);
+        const safeY = Math.min(y, textureHeight - height);
+        const safeWidth = Math.min(width, textureWidth - safeX);
+        const safeHeight = Math.min(height, textureHeight - safeY);
+
+        const texture = new PIXI.Texture(
+            this.symbolsTexture,
+            new PIXI.Rectangle(safeX, safeY, safeWidth, safeHeight)
+        );
+
+        let finalTexture = texture;
+
+        if (data.rotate) {
+            finalTexture = new PIXI.Texture(
+                texture.baseTexture,
+                texture.frame,
+                texture.orig,
+                texture.trim,
+                PIXI.groupD8.SWAP_XY // Xoay texture 90 độ
+            );
+        }
+
+        const sprite = new PIXI.Sprite(finalTexture);
+        sprite.x = Math.random() * 700; // Đặt vị trí ngẫu nhiên
+        sprite.y = Math.random() * 500;
+
+        this.app.stage.addChild(sprite);
+
+        console.log(`Sprite ${data.name} created and added to stage.`);
+    });
+}
+
+
+    addSpriteToStage(texture, name) {
+        const sprite = new PIXI.Sprite(texture);
+        sprite.x = Math.random() * 700; // Đặt vị trí ngẫu nhiên
+        sprite.y = Math.random() * 500;
+        this.app.stage.addChild(sprite);
+        console.log(`Sprite ${name} created and added to stage.`);
+    }
+}
+
+// Khởi tạo game
+window.onload = () => {
+    const game = new MahjongSlot();
+};
+    </script>
+</body>
+</html>
