@@ -4,100 +4,300 @@
     <title>Golden Mahjong Arena Slot</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <style>
+        #game-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #2c3e50;
+        }
+    </style>
 </head>
 <body>
     <div id="game-container"></div>
     <script>
 class MahjongSlot {
     constructor() {
-        this.app = new PIXI.Application({
-            width: 800,
-            height: 600,
-            backgroundColor: 0x1099bb
-        });
-        document.getElementById('game-container').appendChild(this.app.view);
-
-        this.loadAssets().then(() => {
-            this.createSpritesFromAtlas();
-        });
+        this.initializeGame();
+        this.loadAssets();
+        this.sprites = [];
+        this.reels = [];
+        this.NUM_REELS = 5;
+        this.NUM_ROWS = 6;
+        this.SYMBOL_SIZE = 90; // hoặc kích thước thực tế của texture
+        this.REEL_WIDTH = 77 ;
+        this.spinning = false;
     }
+    initializeGame() {
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    const gameRatio = 3/4; // Tỉ lệ chiều rộng/chiều cao mong muốn
+
+    let gameWidth, gameHeight;
+    if (screenWidth / screenHeight > gameRatio) {
+        gameHeight = screenHeight;
+        gameWidth = gameHeight * gameRatio;
+    } else {
+        gameWidth = screenWidth;
+        gameHeight = gameWidth / gameRatio;
+    }
+
+    this.app = new PIXI.Application({
+        width: gameWidth,
+        height: gameHeight,
+        backgroundColor: 0x1099bb,
+        antialias: true,
+        resolution: window.devicePixelRatio || 1,
+    });
+    document.getElementById('game-container').appendChild(this.app.view);
+}
 
     async loadAssets() {
         try {
             this.symbolsTexture = await PIXI.Assets.load('https://tuancho670.github.io/TelegramWeb/Symbols@2x2.webp');
-            console.log("Texture loaded successfully");
+            console.log("Tải texture thành công");
+            
+            const response = await fetch('https://tuancho670.github.io/TelegramWeb/Symbols@2x2.json');
+            this.atlasData = await response.json();
+            
+            this.setupGame();
         } catch (error) {
-            console.error("Failed to load texture:", error);
+            console.error("Lỗi khi tải assets:", error);
         }
     }
 
-    createSpritesFromAtlas() {
-    if (!this.symbolsTexture) {
-        console.error("Texture not loaded");
-        return;
+    setupGame() {
+        this.createReels();
+        this.createMask();
+        this.createSpinButton();
+        
+        // Thêm ticker để update animation
+        this.app.ticker.add(() => {
+            TWEEN.update();
+            this.updateReels();
+        });
     }
 
-    const textureWidth = this.symbolsTexture.width;
-    const textureHeight = this.symbolsTexture.height;
+    createReels() {
+    this.reelContainer = new PIXI.Container();
+    this.app.stage.addChild(this.reelContainer);
 
-    const atlasData = [
-        { name: "3Tong_G", rotate: false, xy: [742, 437], size: [102, 123] },
-        { name: "3Tong_N", rotate: true, xy: [127, 2], size: [123, 102] },
-        // Thêm các sprite khác tương tự
-    ];
+    // Tạo texture cho các symbols từ atlas (giữ nguyên phần này)
+    this.symbolTextures = [];
+    for (const [name, data] of Object.entries(this.atlasData.frames)) {
+        if ((name.endsWith('_N') || name.endsWith('_G')) && !name.startsWith('2Tiao_')) {
+            const texture = this.createTextureFromAtlas(name, data);
+            this.symbolTextures.push(texture);
+        }
+    }
 
-    atlasData.forEach(data => {
-        const scaleX = textureWidth / 1082; // Cân chỉnh tỉ lệ
-        const scaleY = textureHeight / 562;
+ // Tạo reels
+    for (let i = 0; i < this.NUM_REELS; i++) {
+        const reel = this.createReel(i);
+        this.reels.push(reel);
+        this.reelContainer.addChild(reel);
+    }
 
-        const x = Math.floor(data.xy[0] * scaleX);
-        const y = Math.floor(data.xy[1] * scaleY);
-        const width = Math.floor(data.size[0] * scaleX);
-        const height = Math.floor(data.size[1] * scaleY);
 
-        const safeX = Math.min(x, textureWidth - width);
-        const safeY = Math.min(y, textureHeight - height);
-        const safeWidth = Math.min(width, textureWidth - safeX);
-        const safeHeight = Math.min(height, textureHeight - safeY);
+    // Căn giữa container
+    this.reelContainer.x = Math.floor((this.app.screen.width - (this.NUM_REELS * this.REEL_WIDTH)) / 2);
+    this.reelContainer.y = Math.floor((this.app.screen.height - (this.NUM_ROWS * this.SYMBOL_SIZE)) / 2);
+}
 
-        const texture = new PIXI.Texture(
-            this.symbolsTexture,
-            new PIXI.Rectangle(safeX, safeY, safeWidth, safeHeight)
-        );
-
-        let finalTexture = texture;
+    createTextureFromAtlas(name, data) {
+        const scaleX = this.symbolsTexture.width / 1082;
+        const scaleY = this.symbolsTexture.height / 562;
+        
+        const baseWidth = this.symbolsTexture.baseTexture.width;
+        const baseHeight = this.symbolsTexture.baseTexture.height;
 
         if (data.rotate) {
-            finalTexture = new PIXI.Texture(
-                texture.baseTexture,
-                texture.frame,
-                texture.orig,
-                texture.trim,
-                PIXI.groupD8.SWAP_XY // Xoay texture 90 độ
+            const frameX = Math.floor(data.xy.x * scaleX);
+            const frameY = Math.floor(data.xy.y * scaleY);
+            const frameWidth = Math.floor(data.size.y * scaleX); // Đổi x thành y
+            const frameHeight = Math.floor(data.size.x * scaleY); // Đổi y thành x
+
+            const tempTexture = new PIXI.Texture(
+                this.symbolsTexture.baseTexture,
+                new PIXI.Rectangle(frameX, frameY, frameWidth, frameHeight)
+            );
+
+            const maxSize = Math.max(frameWidth, frameHeight);
+            const renderTexture = PIXI.RenderTexture.create({
+                width: maxSize,
+                height: maxSize,
+                resolution: 1 // Đặt resolution là 1
+            });
+
+            const tempSprite = new PIXI.Sprite(tempTexture);
+            tempSprite.anchor.set(0.5);
+            tempSprite.position.set(maxSize / 2, maxSize / 2);
+            tempSprite.rotation = Math.PI / 2;
+
+            this.app.renderer.render(tempSprite, {
+                renderTexture,
+                clear: true
+            });
+
+            return renderTexture;
+        } else {
+            const frameX = Math.floor(data.xy.x * scaleX);
+            const frameY = Math.floor(data.xy.y * scaleY);
+            const frameWidth = Math.floor(data.size.x * scaleX);
+            const frameHeight = Math.floor(data.size.y * scaleY);
+
+            const safeFrameWidth = Math.min(frameWidth, baseWidth - frameX);
+            const safeFrameHeight = Math.min(frameHeight, baseHeight - frameY);
+
+            return new PIXI.Texture(
+        this.symbolsTexture.baseTexture,
+        new PIXI.Rectangle(
+            Math.floor(frameX),
+            Math.floor(frameY),
+            Math.floor(safeFrameWidth),
+            Math.floor(safeFrameHeight)
+        )
             );
         }
+    }
 
-        const sprite = new PIXI.Sprite(finalTexture);
-        sprite.x = Math.random() * 700; // Đặt vị trí ngẫu nhiên
-        sprite.y = Math.random() * 500;
-
-        this.app.stage.addChild(sprite);
-
-        console.log(`Sprite ${data.name} created and added to stage.`);
-    });
+    createReel(index) {
+    const reel = new PIXI.Container();
+    reel.x = index * this.REEL_WIDTH;
+    
+    reel.symbols = [];
+    for (let j = 0; j < this.NUM_ROWS + 3; j++) {
+        const symbol = this.createSymbol();
+        symbol.y = j * this.SYMBOL_SIZE + this.SYMBOL_SIZE / 2;
+        symbol.x = this.REEL_WIDTH / 2;
+        reel.addChild(symbol);
+        reel.symbols.push(symbol);
+    }
+    
+    return reel;
 }
 
+createSymbol() {
+    const randomTexture = this.symbolTextures[Math.floor(Math.random() * this.symbolTextures.length)];
+    const symbol = new PIXI.Sprite(randomTexture);
+    symbol.scale.set(1.5); // Giảm scale xuống một chút
+    symbol.anchor.set(0.5, 0.5); // Đặt anchor ở giữa sprite
+    return symbol;
+}
 
-    addSpriteToStage(texture, name) {
-        const sprite = new PIXI.Sprite(texture);
-        sprite.x = Math.random() * 700; // Đặt vị trí ngẫu nhiên
-        sprite.y = Math.random() * 500;
-        this.app.stage.addChild(sprite);
-        console.log(`Sprite ${name} created and added to stage.`);
+createMask() {
+    const mask = new PIXI.Graphics();
+    mask.beginFill(0xFFFFFF);
+    mask.drawRect(
+        0,
+        0,
+        this.NUM_REELS * this.REEL_WIDTH,
+        this.NUM_ROWS * this.SYMBOL_SIZE
+    );
+    mask.endFill();
+    this.reelContainer.mask = mask;
+    this.reelContainer.addChild(mask);
+}
+
+    createSpinButton() {
+        const button = new PIXI.Graphics();
+        button.beginFill(0xFF0000);
+        button.drawRect(this.app.screen.width - 100, this.app.screen.height - 50, 80, 40);
+        button.endFill();
+        button.interactive = true;
+        button.cursor = 'pointer';
+        button.on('pointerdown', () => this.spin());
+        this.app.stage.addChild(button);
+    }
+
+    spin() {
+        if (this.spinning) return;
+        this.spinning = true;
+
+        this.reels.forEach((reel, index) => {
+            reel.spinning = true;
+            reel.spinSpeed = 30;
+            
+            // Stop reels one by one
+            setTimeout(() => {
+                this.stopReel(reel);
+            }, 2000 + index * 500);
+        });
+
+        // Reset spinning state after all reels stop
+        setTimeout(() => {
+            this.spinning = false;
+            this.checkWin();
+        }, 2000 + (this.NUM_REELS - 1) * 500);
+    }
+
+    stopReel(reel) {
+        const targetY = Math.round(reel.symbols[0].y / this.SYMBOL_SIZE) * this.SYMBOL_SIZE;
+        
+        new TWEEN.Tween(reel.symbols[0])
+            .to({ y: targetY }, 200)
+            .easing(TWEEN.Easing.Bounce.Out)
+            .start()
+            .onComplete(() => {
+                reel.spinning = false;
+                this.adjustReelSymbols(reel);
+            });
+    }
+
+    adjustReelSymbols(reel) {
+        const firstY = reel.symbols[0].y;
+        reel.symbols.forEach((symbol, index) => {
+            symbol.y = firstY + (index * this.SYMBOL_SIZE);
+            
+            // Replace texture with new random symbol
+            if (symbol.y >= (this.NUM_ROWS + 3) * this.SYMBOL_SIZE) {
+                const randomTexture = this.symbolTextures[Math.floor(Math.random() * this.symbolTextures.length)];
+                symbol.texture = randomTexture;
+            }
+        });
+        reel.symbols.sort((a, b) => a.y - b.y);
+    }
+
+    updateReels() {
+        this.reels.forEach(reel => {
+            if (reel.spinning) {
+                reel.symbols.forEach(symbol => {
+                    symbol.y += reel.spinSpeed;
+                    if (symbol.y >= (this.NUM_ROWS + 3) * this.SYMBOL_SIZE) {
+                        // Move to top and change texture
+                        symbol.y = reel.symbols[0].y - this.SYMBOL_SIZE;
+                        const randomTexture = this.symbolTextures[Math.floor(Math.random() * this.symbolTextures.length)];
+                        symbol.texture = randomTexture;
+                        
+                        // Reorder symbols array
+                        const index = reel.symbols.indexOf(symbol);
+                        reel.symbols.splice(index, 1);
+                        reel.symbols.unshift(symbol);
+                    }
+                });
+            }
+        });
+    }
+
+    checkWin() {
+        console.log('Checking win combinations...');
+        // Implement win checking logic here
+    }
+
+    cleanup() {
+        this.reels.forEach(reel => {
+            reel.symbols.forEach(symbol => {
+                if (symbol && symbol.destroy) {
+                    symbol.destroy({ children: true, texture: true, baseTexture: false });
+                }
+            });
+        });
+        this.reels = [];
     }
 }
 
-// Khởi tạo game
 window.onload = () => {
     const game = new MahjongSlot();
 };
