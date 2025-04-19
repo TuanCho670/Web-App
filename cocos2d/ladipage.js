@@ -1,4 +1,4 @@
-window.initCocosGame = function(){
+window.initCocosGame  = function(){
     // Cấu hình cho WebGL với fallback sang Canvas
     cc.game.CONFIG_KEY.renderMode = cc.sys.capabilities.hasOwnProperty('opengl') ? 1 : 0;
 
@@ -10,14 +10,42 @@ window.initCocosGame = function(){
             
             // Đối với Android và iOS, thêm các xử lý đặc biệt
             if (cc.sys.os === cc.sys.OS_ANDROID || cc.sys.os === cc.sys.OS_IOS) {
-                // Xóa các texture không sử dụng
-                cc.textureCache.removeUnusedTextures();
-                
-                // Đảm bảo các event đã được xóa
-                cc.eventManager.removeAllCustomListeners();
-                
-                // Đảm bảo các actions đã dừng
-                cc.director.getActionManager().removeAllActions();
+                try {
+                    // Cố gắng xóa các texture không sử dụng 
+                    if (cc.textureCache) {
+                        // Ghi log danh sách texture hiện tại (debug)
+                        if (typeof cc.textureCache.dumpCachedTextureInfo === 'function') {
+                            cc.textureCache.dumpCachedTextureInfo();
+                        }
+                    }
+                    
+                    // Đảm bảo các event đã được xóa - kiểm tra phương thức có tồn tại không
+                    if (cc.eventManager) {
+                        // Xóa event listener cụ thể mà chúng ta biết được sử dụng
+                        if (typeof cc.eventManager.removeCustomListeners === 'function') {
+                            cc.eventManager.removeCustomListeners('game-resize');
+                        }
+                        else if (typeof cc.eventManager.removeListeners === 'function') {
+                            // Thử phương thức thay thế
+                            cc.eventManager.removeListeners(cc.EventListener.CUSTOM);
+                        }
+                    }
+                    
+                    // Đảm bảo các actions đã dừng
+                    if (cc.director && cc.director.getActionManager) {
+                        var actionManager = cc.director.getActionManager();
+                        if (actionManager && typeof actionManager.removeAllActions === 'function') {
+                            actionManager.removeAllActions();
+                        }
+                    }
+                    
+                    // Gọi từ lớp ScreenManager nếu có
+                    if (typeof ScreenManager !== 'undefined' && ScreenManager.onMemoryWarning) {
+                        ScreenManager.onMemoryWarning();
+                    }
+                } catch (e) {
+                    console.error("Error during garbage collection:", e);
+                }
             }
         }
     };
@@ -730,7 +758,7 @@ this.addChild(this.allinButton, 10);
             self.startNewHand();
             self.isGameInProgress = false;
             self.isHandInProgress = false;
-        }, 5.0);
+        }, 1.0);
     },
     
     // Tạo thông tin người chơi
@@ -755,8 +783,93 @@ this.addChild(this.allinButton, 10);
         this.addChild(bottomPlayer, 3);
     },
     
-  
+   // Phương thức kiểm tra và in trạng thái đầy đủ của nút
 
+    // Thêm vào MyScene hoặc StartScene tùy thuộc vào bạn muốn đặt nút này ở đâu
+    // createQuitGameButton: function() {
+    //     var size = cc.director.getWinSize();
+        
+    //     // Tạo nút đơn giản hơn
+    //     var quitButton = new ccui.Button();
+    //     quitButton.loadTextures(
+    //         "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_red.png",
+    //         "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_red.png",
+    //         "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_red.png"
+    //     );
+        
+    //     // Đặt vị trí ở trung tâm màn hình
+    //     quitButton.setPosition(cc.p(size.width / 2, size.height / 2));
+        
+    //     // Sử dụng kích thước cố định thay vì tableScale
+    //     quitButton.setScale(1.0);
+        
+    //     // Thêm text "QUIT"
+    //     var quitLabel = new cc.LabelTTF("QUIT", "Arial Bold", 35);
+    //     quitLabel.setPosition(quitButton.width/2, quitButton.height/2);
+    //     quitLabel.setColor(cc.color(255, 255, 255));
+    //     quitButton.addChild(quitLabel);
+        
+    //     // Thêm vào scene với z-index cao
+    //     this.addChild(quitButton, 1000);
+        
+    //     console.log("Created QUIT button at", size.width / 2, size.height / 2);
+
+    //       // Thiết lập callback khi nhấn nút
+    // quitButton.addTouchEventListener(function(sender, type) {
+    //     if (type === ccui.Widget.TOUCH_ENDED) {
+    //         console.log("QUIT button clicked - ending game engine!");
+            
+    //         // Phát âm thanh khi nhấp nút (nếu có)
+    //         if (self.soundManager) {
+    //             self.soundManager.play("button");
+    //         }
+            
+    //         // Hiệu ứng fade out
+    //         var fadeOut = cc.FadeOut.create(0.5);
+            
+    //         // Callback để kết thúc game engine
+    //         var callback = cc.CallFunc.create(function() {
+    //             // Hiển thị thông báo trước khi thoát (tùy chọn)
+    //             try {
+    //                 // Hiển thị thông báo kết thúc
+    //                 var overlay = document.createElement('div');
+    //                 overlay.style.position = 'fixed';
+    //                 overlay.style.top = '0';
+    //                 overlay.style.left = '0';
+    //                 overlay.style.width = '100%';
+    //                 overlay.style.height = '100%';
+    //                 overlay.style.background = 'rgba(0,0,0,0.8)';
+    //                 overlay.style.color = 'white';
+    //                 overlay.style.fontSize = '24px';
+    //                 overlay.style.textAlign = 'center';
+    //                 overlay.style.paddingTop = '40%';
+    //                 overlay.style.zIndex = '9999';
+    //                 overlay.innerHTML = 'Game Ended. Thank you for playing!';
+    //                 document.body.appendChild(overlay);
+
+    //                 // Kết thúc game engine sau 1.5 giây
+    //                 setTimeout(function() {
+    //                     cc.game.end();
+                        
+    //                     // Sau khi kết thúc game, có thể thêm mã để refresh trang 
+    //                     // hoặc chuyển hướng đến URL khác (tùy chọn)
+    //                     // location.reload();
+    //                     // window.location.href = 'some-url.html';
+    //                 }, 1500);
+    //             } catch(e) {
+    //                 // Trong trường hợp có lỗi, kết thúc ngay lập tức
+    //                 cc.game.end();
+    //             }
+    //         });
+            
+    //         // Thực hiện hiệu ứng fade out và sau đó kết thúc game
+    //         // self.runAction(cc.Sequence.create(fadeOut, callback));
+    //     }
+    // }, this);
+        
+    //     return quitButton;
+    // },
+// Sửa phương thức createActionButton để log mỗi lần có sự kiện click
 
     
     // Helper: Tạo thông tin người chơi
@@ -934,40 +1047,54 @@ hideActionButtons: function() {
 
 
 // Sửa phương thức showActionButtons để log chi tiết hơn
+// Trong phương thức showActionButtons, thêm bước kiểm tra và đảm bảo nút hiển thị
 showActionButtons: function() {
-console.log("showActionButtons() called - game state:", this.gameState.state);
+    console.log("showActionButtons() called - game state:", this.gameState.state);
 
-// ✅ Ngăn show lại nếu đã bị ẩn bằng tay
-if (this.buttonsHiddenManually) {
-console.log("Blocked showActionButtons() - hidden manually");
-return;
-}
+    // ✅ Ngăn show lại nếu đã bị ẩn bằng tay
+    if (this.buttonsHiddenManually) {
+        console.log("Blocked showActionButtons() - hidden manually");
+        return;
+    }
 
-if (this.gameState.state !== "playerTurn") {
-console.log("Not showing buttons - not player's turn");
-return;
-}
+    if (this.gameState.state !== "playerTurn") {
+        console.log("Not showing buttons - not player's turn");
+        return;
+    }
 
-if (this.foldButton && this.allinButton) {
-console.log("Before showing - Fold visible:", this.foldButton.isVisible(), 
-            "All-in visible:", this.allinButton.isVisible(),
-            "buttonActive:", this.buttonActive,
-            "buttonActionInProgress:", this.buttonActionInProgress);
+    if (this.foldButton && this.allinButton) {
+        console.log("Before showing - Fold visible:", this.foldButton.isVisible(), 
+                    "All-in visible:", this.allinButton.isVisible(),
+                    "buttonActive:", this.buttonActive,
+                    "buttonActionInProgress:", this.buttonActionInProgress);
 
-this.buttonActionInProgress = false;
+        this.buttonActionInProgress = false;
 
-this.foldButton.setVisible(true);
-this.allinButton.setVisible(true);
-this.setButtonsActive(true);
-this.buttonsHidden = false;
-
-console.log("After showing - Fold visible:", this.foldButton.isVisible(), 
-            "All-in visible:", this.allinButton.isVisible(),
-            "buttonActive:", this.buttonActive,
-            "buttonsHidden:", this.buttonsHidden);
-} else {
-console.log("Cannot show buttons - not initialized");
-}
+        // Thêm timeout nhỏ để đảm bảo hiển thị (có thể giúp trên thiết bị di động)
+        var self = this;
+        setTimeout(function() {
+            self.foldButton.setVisible(true);
+            self.allinButton.setVisible(true);
+            self.setButtonsActive(true);
+            self.buttonsHidden = false;
+            self.checkButtonVisibility();
+            
+            // Force refresh UI bằng cách update position
+            var size = cc.director.getWinSize();
+            var centerX = size.width / 2;
+            var buttonSpacing = 120;
+            var yPos = 60;
+            self.foldButton.setPosition(cc.p(centerX - buttonSpacing, yPos));
+            self.allinButton.setPosition(cc.p(centerX + buttonSpacing, yPos));
+            
+            console.log("After showing (with timeout) - Fold visible:", self.foldButton.isVisible(), 
+                        "All-in visible:", self.allinButton.isVisible(),
+                        "buttonActive:", self.buttonActive,
+                        "buttonsHidden:", self.buttonsHidden);
+        }, 100);
+    } else {
+        console.log("Cannot show buttons - not initialized");
+    }
 },
 
 
@@ -2247,10 +2374,79 @@ for (var i = 0; i < cardValues.length; i++) {
 
 // Hiển thị nút sau khi tất cả lá bài đã được hiển thị
 self.scheduleOnce(function() {
-if (self.gameState.state === "playerTurn") {
-    self.showActionButtons();
-}
+    if (self.gameState.state === "playerTurn") {
+        console.log("Showing action buttons after card animation");
+        self.showActionButtons();
+        
+        // Thêm đoạn code này để kiểm tra sau một khoảng thời gian
+        self.scheduleOnce(function() {
+            console.log("DOUBLE CHECK BUTTONS - Fold visible:", self.foldButton.isVisible(), 
+                         "All-in visible:", self.allinButton.isVisible(),
+                         "buttonActive:", self.buttonActive);
+            
+            // Nếu nút vẫn không hiển thị, thử hiển thị lại
+            if (!self.foldButton.isVisible() || !self.allinButton.isVisible()) {
+                console.log("Buttons not visible - forcing show again");
+                self.buttonsHiddenManually = false; // Reset flag
+                self.showActionButtons();
+            }
+        }, 0.5);
+    }
 }, delay * cardValues.length + 0.5); // Đợi thêm 0.5s sau lá bài cuối
+},
+
+// Thêm phương thức này vào MyScene
+forceShowButtons: function() {
+    console.log("Force showing buttons");
+    this.buttonsHiddenManually = false;
+    
+    if (this.foldButton && this.allinButton) {
+        th
+        is.foldButton.setVisible(true);
+        this.allinButton.setVisible(true);
+        this.setButtonsActive(true);
+        this.buttonsHidden = false;
+        
+        // Refresh position
+        var size = cc.director.getWinSize();
+        var centerX = size.width / 2;
+        var buttonSpacing = 120;
+        var yPos = 60;
+        this.foldButton.setPosition(cc.p(centerX - buttonSpacing, yPos));
+        this.allinButton.setPosition(cc.p(centerX + buttonSpacing, yPos));
+        
+        console.log("Force show complete - Fold visible:", this.foldButton.isVisible(), 
+                    "All-in visible:", this.allinButton.isVisible());
+    }
+},
+
+checkButtonVisibility: function() {
+    if (!this.foldButton || !this.allinButton) {
+        console.log("Buttons not initialized");
+        return;
+    }
+    
+    console.log("==== DETAILED BUTTON CHECK ====");
+    console.log("Fold button properties:");
+    console.log(" - visible:", this.foldButton.isVisible());
+    console.log(" - opacity:", this.foldButton.getOpacity());
+    console.log(" - scale:", this.foldButton.getScale());
+    console.log(" - position:", this.foldButton.getPosition().x, this.foldButton.getPosition().y);
+    console.log(" - parent:", !!this.foldButton.getParent());
+    console.log(" - z-index:", this.foldButton.getLocalZOrder());
+    
+    console.log("All-in button properties:");
+    console.log(" - visible:", this.allinButton.isVisible());
+    console.log(" - opacity:", this.allinButton.getOpacity());
+    console.log(" - scale:", this.allinButton.getScale());
+    console.log(" - position:", this.allinButton.getPosition().x, this.allinButton.getPosition().y);
+    console.log(" - parent:", !!this.allinButton.getParent());
+    console.log(" - z-index:", this.allinButton.getLocalZOrder());
+    
+    // Kiểm tra xem nút có đang nằm trong viewport không
+    var winSize = cc.director.getWinSize();
+    console.log("Window size:", winSize.width, "x", winSize.height);
+    console.log("==============================");
 },
 
 // Tạo animation lật bài từ 4 frame đầu tiên
