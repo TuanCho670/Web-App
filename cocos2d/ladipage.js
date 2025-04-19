@@ -664,7 +664,7 @@ var MyScene = cc.Scene.extend({
         // Flag để ngăn xử lý chồng chéo
         this.isGameInProgress = false;
         
-        this.quitButton = this.createQuitGameButton();
+        // this.quitButton = this.createQuitGameButton();
 
         // Hiển thị số chip trong ví
         this.displayWalletInfo();
@@ -755,93 +755,8 @@ this.addChild(this.allinButton, 10);
         this.addChild(bottomPlayer, 3);
     },
     
-   // Phương thức kiểm tra và in trạng thái đầy đủ của nút
+  
 
-    // Thêm vào MyScene hoặc StartScene tùy thuộc vào bạn muốn đặt nút này ở đâu
-    // createQuitGameButton: function() {
-    //     var size = cc.director.getWinSize();
-        
-    //     // Tạo nút đơn giản hơn
-    //     var quitButton = new ccui.Button();
-    //     quitButton.loadTextures(
-    //         "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_red.png",
-    //         "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_red.png",
-    //         "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_red.png"
-    //     );
-        
-    //     // Đặt vị trí ở trung tâm màn hình
-    //     quitButton.setPosition(cc.p(size.width / 2, size.height / 2));
-        
-    //     // Sử dụng kích thước cố định thay vì tableScale
-    //     quitButton.setScale(1.0);
-        
-    //     // Thêm text "QUIT"
-    //     var quitLabel = new cc.LabelTTF("QUIT", "Arial Bold", 35);
-    //     quitLabel.setPosition(quitButton.width/2, quitButton.height/2);
-    //     quitLabel.setColor(cc.color(255, 255, 255));
-    //     quitButton.addChild(quitLabel);
-        
-    //     // Thêm vào scene với z-index cao
-    //     this.addChild(quitButton, 1000);
-        
-    //     console.log("Created QUIT button at", size.width / 2, size.height / 2);
-
-    //       // Thiết lập callback khi nhấn nút
-    // quitButton.addTouchEventListener(function(sender, type) {
-    //     if (type === ccui.Widget.TOUCH_ENDED) {
-    //         console.log("QUIT button clicked - ending game engine!");
-            
-    //         // Phát âm thanh khi nhấp nút (nếu có)
-    //         if (self.soundManager) {
-    //             self.soundManager.play("button");
-    //         }
-            
-    //         // Hiệu ứng fade out
-    //         var fadeOut = cc.FadeOut.create(0.5);
-            
-    //         // Callback để kết thúc game engine
-    //         var callback = cc.CallFunc.create(function() {
-    //             // Hiển thị thông báo trước khi thoát (tùy chọn)
-    //             try {
-    //                 // Hiển thị thông báo kết thúc
-    //                 var overlay = document.createElement('div');
-    //                 overlay.style.position = 'fixed';
-    //                 overlay.style.top = '0';
-    //                 overlay.style.left = '0';
-    //                 overlay.style.width = '100%';
-    //                 overlay.style.height = '100%';
-    //                 overlay.style.background = 'rgba(0,0,0,0.8)';
-    //                 overlay.style.color = 'white';
-    //                 overlay.style.fontSize = '24px';
-    //                 overlay.style.textAlign = 'center';
-    //                 overlay.style.paddingTop = '40%';
-    //                 overlay.style.zIndex = '9999';
-    //                 overlay.innerHTML = 'Game Ended. Thank you for playing!';
-    //                 document.body.appendChild(overlay);
-
-    //                 // Kết thúc game engine sau 1.5 giây
-    //                 setTimeout(function() {
-    //                     cc.game.end();
-                        
-    //                     // Sau khi kết thúc game, có thể thêm mã để refresh trang 
-    //                     // hoặc chuyển hướng đến URL khác (tùy chọn)
-    //                     // location.reload();
-    //                     // window.location.href = 'some-url.html';
-    //                 }, 1500);
-    //             } catch(e) {
-    //                 // Trong trường hợp có lỗi, kết thúc ngay lập tức
-    //                 cc.game.end();
-    //             }
-    //         });
-            
-    //         // Thực hiện hiệu ứng fade out và sau đó kết thúc game
-    //         // self.runAction(cc.Sequence.create(fadeOut, callback));
-    //     }
-    // }, this);
-        
-    //     return quitButton;
-    // },
-// Sửa phương thức createActionButton để log mỗi lần có sự kiện click
 
     
     // Helper: Tạo thông tin người chơi
