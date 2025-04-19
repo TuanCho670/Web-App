@@ -1,6 +1,26 @@
 window.initCocosGame = function(){
     // Cấu hình cho WebGL với fallback sang Canvas
     cc.game.CONFIG_KEY.renderMode = cc.sys.capabilities.hasOwnProperty('opengl') ? 1 : 0;
+
+    var gameUtils = {
+        // Hàm giải phóng bộ nhớ cho thiết bị di động
+        forceGarbageCollection: function() {
+            // Yêu cầu GC
+            cc.sys.garbageCollect();
+            
+            // Đối với Android và iOS, thêm các xử lý đặc biệt
+            if (cc.sys.os === cc.sys.OS_ANDROID || cc.sys.os === cc.sys.OS_IOS) {
+                // Xóa các texture không sử dụng
+                cc.textureCache.removeUnusedTextures();
+                
+                // Đảm bảo các event đã được xóa
+                cc.eventManager.removeAllCustomListeners();
+                
+                // Đảm bảo các actions đã dừng
+                cc.director.getActionManager().removeAllActions();
+            }
+        }
+    };
     
     var ScreenManager = {
         // Kích thước thiết kế cố định cho tất cả các scene
@@ -396,31 +416,44 @@ window.initCocosGame = function(){
             button.runAction(scaleAction);
             
             // Thiết lập callback trực tiếp cho button
-            button.addTouchEventListener(function(sender, type) {
-                if (type === ccui.Widget.TOUCH_ENDED) {
-                    console.log("START button clicked!");
-                    
-                    // Phát âm thanh khi nhấp nút (nếu đã load)
-                    try {
-                        if (MyScene.prototype && MyScene.prototype.soundManager) {
-                            MyScene.prototype.soundManager.play("button");
-                        }
-                    } catch(e) {
-                        console.log("Sound manager not initialized yet");
-                    }
-                    
-                    // Hiệu ứng fade out toàn màn hình
-                    var fadeOut = cc.FadeOut.create(0.5);
-                    
-                    // Chuyển sang game scene sau khi fade out
-                    var callback = cc.CallFunc.create(function() {
-                        // Bắt đầu tải tài nguyên và chuyển qua MainScene
-                        self.startMainGame();
-                    });
-                    
-                    self.runAction(cc.Sequence.create(fadeOut, callback));
-                }
-            }, this);
+         // Thiết lập callback trực tiếp cho button
+button.addTouchEventListener(function(sender, type) {
+    if (type === ccui.Widget.TOUCH_ENDED) {
+        console.log("START button clicked!");
+        
+        // Tắt listener để tránh nhấn nhiều lần
+        button.setTouchEnabled(false);
+        
+        // Phát âm thanh khi nhấp nút (nếu đã load)
+        try {
+            if (MyScene.prototype && MyScene.prototype.soundManager) {
+                MyScene.prototype.soundManager.play("button");
+            }
+        } catch(e) {
+            console.log("Sound manager not initialized yet");
+        }
+        
+        // Hiệu ứng fade out toàn màn hình
+        var fadeOut = cc.FadeOut.create(0.5);
+        
+        // Chuyển sang game scene sau khi fade out
+        var callback = cc.CallFunc.create(function() {
+            // Xóa các scene cũ và giải phóng bộ nhớ
+            cc.director.purgeCachedData();
+            
+            // Dừng và xóa tất cả các animation
+            cc.director.getActionManager().removeAllActions();
+            
+            // Xóa tất cả listeners toàn cục
+            cc.eventManager.removeAllListeners();
+            
+            // Bắt đầu tải tài nguyên và chuyển qua MainScene
+            self.startMainGame();
+        });
+        
+        self.runAction(cc.Sequence.create(fadeOut, callback));
+    }
+}, this);
             
             // Lưu tham chiếu
             this.startButton = button;
@@ -432,9 +465,19 @@ window.initCocosGame = function(){
         },
         
         startMainGame: function() {
-            // Khởi chạy game mới
+            // Xóa tất cả các event listeners còn sót lại
+            cc.eventManager.removeCustomListeners('game-resize');
+            
+            // Tạo scene mới và đảm bảo xóa scene cũ
             var gameScene = new MyScene();
-            cc.director.runScene(gameScene);
+            
+            // Sử dụng runSceneWithFlags thay vì runScene để đảm bảo xóa scene cũ
+            cc.director.runScene(new cc.TransitionFade(0.5, gameScene, cc.color(0, 0, 0)));
+            
+            // Khởi tạo bộ thu gom rác
+            setTimeout(function() {
+                cc.sys.garbageCollect();
+            }, 500);
         },
         
         onEnter: function() {
@@ -443,8 +486,29 @@ window.initCocosGame = function(){
         
         onExit: function() {
             this._super();
+            
             // Xóa listener khi scene thoát
             cc.eventManager.removeCustomListeners('game-resize');
+            
+            // Dừng tất cả hành động
+            this.stopAllActions();
+            
+            // Xóa tất cả các children
+            this.removeAllChildren(true);
+            
+            // Giải phóng các tài nguyên không cần thiết
+            var textures = [
+                "https://tuancho670.github.io/Web-App/assets/card/card_back_bg.png",
+                "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_yellow.png"
+            ];
+            
+            // Không xóa texture ngay lập tức, chỉ đánh dấu để xóa sau
+            textures.forEach(function(texture) {
+                var tex = cc.textureCache.getTextureForKey(texture);
+                if (tex) {
+                    tex.releaseTexture = true; // Đánh dấu để xóa sau
+                }
+            });
         }
     });
 
@@ -469,7 +533,8 @@ var MyScene = cc.Scene.extend({
     tableScale: null,
     foldButton: null,
     allinButton: null,
-    
+
+    isInitialized: false, // Flag để kiểm tra scene đã được khởi tạo chưa
     // State variables for button/interaction control
     buttonActive: false,
     buttonActionInProgress: false,
@@ -506,6 +571,13 @@ var MyScene = cc.Scene.extend({
         
         audioElements: {},
         enabled: true,
+
+        onLoad: function() {
+            this._super();
+            // Kiểm tra nếu scene đã được khởi tạo, không khởi tạo lại
+            if (this.isInitialized) return;
+            this.isInitialized = true;
+        },
         
         preloadAll: function() {
             try {
@@ -573,12 +645,27 @@ var MyScene = cc.Scene.extend({
         this._super();
         var size = cc.director.getWinSize();
         var self = this;
+
+           // Đảm bảo rằng scene sẽ không khởi tạo lại nếu đã được khởi tạo
+    if (this.isSceneSetup) return;
+    this.isSceneSetup = true;
         
+     // Xóa các tham chiếu cũ nếu có
+     if (this.table) this.table = null;
+     if (this.topPlayer) this.topPlayer = null;
+     if (this.bottomPlayer) this.bottomPlayer = null;
+     if (this.potBg) this.potBg = null;
+     if (this.potAmountLabel) this.potAmountLabel = null;
+     if (this.foldButton) this.foldButton = null;
+     if (this.allinButton) this.allinButton = null;
+
         console.log("Scene entered - initializing game");
         
         // Flag để ngăn xử lý chồng chéo
         this.isGameInProgress = false;
         
+        this.quitButton = this.createQuitGameButton();
+
         // Hiển thị số chip trong ví
         this.displayWalletInfo();
         
@@ -642,7 +729,8 @@ this.addChild(this.allinButton, 10);
             console.log("Starting new hand from onEnter");
             self.startNewHand();
             self.isGameInProgress = false;
-        }, 1.0);
+            self.isHandInProgress = false;
+        }, 5.0);
     },
     
     // Tạo thông tin người chơi
@@ -669,7 +757,90 @@ this.addChild(this.allinButton, 10);
     
    // Phương thức kiểm tra và in trạng thái đầy đủ của nút
 
+    // Thêm vào MyScene hoặc StartScene tùy thuộc vào bạn muốn đặt nút này ở đâu
+    createQuitGameButton: function() {
+        var size = cc.director.getWinSize();
+        
+        // Tạo nút đơn giản hơn
+        var quitButton = new ccui.Button();
+        quitButton.loadTextures(
+            "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_red.png",
+            "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_red.png",
+            "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_red.png"
+        );
+        
+        // Đặt vị trí ở trung tâm màn hình
+        quitButton.setPosition(cc.p(size.width / 2, size.height / 2));
+        
+        // Sử dụng kích thước cố định thay vì tableScale
+        quitButton.setScale(1.0);
+        
+        // Thêm text "QUIT"
+        var quitLabel = new cc.LabelTTF("QUIT", "Arial Bold", 35);
+        quitLabel.setPosition(quitButton.width/2, quitButton.height/2);
+        quitLabel.setColor(cc.color(255, 255, 255));
+        quitButton.addChild(quitLabel);
+        
+        // Thêm vào scene với z-index cao
+        this.addChild(quitButton, 1000);
+        
+        console.log("Created QUIT button at", size.width / 2, size.height / 2);
 
+          // Thiết lập callback khi nhấn nút
+    quitButton.addTouchEventListener(function(sender, type) {
+        if (type === ccui.Widget.TOUCH_ENDED) {
+            console.log("QUIT button clicked - ending game engine!");
+            
+            // Phát âm thanh khi nhấp nút (nếu có)
+            if (self.soundManager) {
+                self.soundManager.play("button");
+            }
+            
+            // Hiệu ứng fade out
+            var fadeOut = cc.FadeOut.create(0.5);
+            
+            // Callback để kết thúc game engine
+            var callback = cc.CallFunc.create(function() {
+                // Hiển thị thông báo trước khi thoát (tùy chọn)
+                try {
+                    // Hiển thị thông báo kết thúc
+                    var overlay = document.createElement('div');
+                    overlay.style.position = 'fixed';
+                    overlay.style.top = '0';
+                    overlay.style.left = '0';
+                    overlay.style.width = '100%';
+                    overlay.style.height = '100%';
+                    overlay.style.background = 'rgba(0,0,0,0.8)';
+                    overlay.style.color = 'white';
+                    overlay.style.fontSize = '24px';
+                    overlay.style.textAlign = 'center';
+                    overlay.style.paddingTop = '40%';
+                    overlay.style.zIndex = '9999';
+                    overlay.innerHTML = 'Game Ended. Thank you for playing!';
+                    document.body.appendChild(overlay);
+
+                    // Kết thúc game engine sau 1.5 giây
+                    setTimeout(function() {
+                        cc.game.end();
+                        
+                        // Sau khi kết thúc game, có thể thêm mã để refresh trang 
+                        // hoặc chuyển hướng đến URL khác (tùy chọn)
+                        // location.reload();
+                        // window.location.href = 'some-url.html';
+                    }, 1500);
+                } catch(e) {
+                    // Trong trường hợp có lỗi, kết thúc ngay lập tức
+                    cc.game.end();
+                }
+            });
+            
+            // Thực hiện hiệu ứng fade out và sau đó kết thúc game
+            // self.runAction(cc.Sequence.create(fadeOut, callback));
+        }
+    }, this);
+        
+        return quitButton;
+    },
 // Sửa phương thức createActionButton để log mỗi lần có sự kiện click
 
     
@@ -902,6 +1073,16 @@ console.log("Cannot show buttons - not initialized");
         console.log("Starting new hand");
 
         this.buttonsHiddenManually = false;
+
+         // Đảm bảo không có hand đang chạy
+    if (this.isHandInProgress) {
+        console.log("Hand already in progress, ignoring duplicate call");
+        return;
+    }
+
+    this.isHandInProgress = true;
+
+    this.buttonsHiddenManually = false;
         
         // Đảm bảo nạp lại chip
         this.refillPlayerStack();
@@ -2533,52 +2714,80 @@ console.log("AI stack balanced to:", this.gameState.aiDefaultStack);
 
 // Xóa bàn để bắt đầu ván mới
 clearTable: function() {
-var self = this;
-console.log("Clearing table...");
+    var self = this;
+    console.log("Clearing table...");
 
-// Hủy bỏ tất cả lịch chờ
-this.unscheduleAllCallbacks();
+    // Hủy bỏ tất cả lịch chờ
+    this.unscheduleAllCallbacks();
 
-// Tìm và xóa tất cả sprite lá bài trên bàn
-var children = this.getChildren();
-var cardsToRemove = [];
+    // Tìm và xóa tất cả sprite lá bài trên bàn
+    var children = this.getChildren();
+    var cardsToRemove = [];
 
-for (var i = 0; i < children.length; i++) {
-var child = children[i];
-if (child instanceof cc.Sprite) {
-    // Kiểm tra nếu là lá bài (dựa trên URL hoặc texture)
-    var url = "";
-    if (child.getTexture && child.getTexture()) {
-        url = child.getTexture().url || "";
+    for (var i = 0; i < children.length; i++) {
+        var child = children[i];
+        if (!child) continue; // Kiểm tra null để tránh lỗi
+
+        if (child instanceof cc.Sprite) {
+            // Kiểm tra nếu là lá bài (dựa trên URL hoặc texture)
+            var url = "";
+            try {
+                if (child.getTexture && child.getTexture()) {
+                    url = child.getTexture().url || "";
+                }
+            } catch (e) {
+                // Bỏ qua lỗi nếu texture đã bị hủy
+                continue;
+            }
+            
+            // Kiểm tra nếu là lá bài (có chứa "card" trong URL hoặc đã được đánh dấu)
+            if (url.indexOf("card") >= 0 || child.cardFlag) {
+                cardsToRemove.push(child);
+            }
+        }
+    }
+
+    // Xóa từng lá bài với hiệu ứng mờ dần
+    for (var i = 0; i < cardsToRemove.length; i++) {
+        var card = cardsToRemove[i];
+        if (!card || !card.parent) continue; // Kiểm tra lại trước khi xóa
+        
+        // Tạo bản sao tham chiếu để tránh closure issue
+        (function(cardRef) {
+            cardRef.runAction(cc.Sequence.create(
+                cc.FadeOut.create(0.3),
+                cc.CallFunc.create(function(target) {
+                    if (target && target.parent) {
+                        target.removeFromParent(true);
+                    }
+                })
+            ));
+        })(card);
+    }
+
+    console.log("Removed " + cardsToRemove.length + " cards from table");
+
+    // Reset pot và UI khác
+    if (this.potBg && this.potAmountLabel) {
+        this.potAmount = 0;
+        this.potAmountLabel.setString("0");
     }
     
-    // Kiểm tra nếu là lá bài (có chứa "card" trong URL hoặc đã được đánh dấu)
-    if (url.indexOf("card") >= 0 || child.cardFlag) {
-        cardsToRemove.push(child);
-    }
-}
-}
-
-// Xóa từng lá bài với hiệu ứng mờ dần
-for (var i = 0; i < cardsToRemove.length; i++) {
-var card = cardsToRemove[i];
-card.runAction(cc.Sequence.create(
-    cc.FadeOut.create(0.3),
-    cc.CallFunc.create(function(target) {
-        if (target && target.parent) {
-            target.removeFromParent(true);
+    // Thêm một callback để đảm bảo rằng tất cả các card đã được xóa hoàn toàn
+    this.scheduleOnce(function() {
+        // Kiểm tra và xóa bất kỳ card nào còn sót lại
+        var remainingChildren = self.getChildren();
+        for (var i = 0; i < remainingChildren.length; i++) {
+            var child = remainingChildren[i];
+            if (!child) continue;
+            
+            if ((child instanceof cc.Sprite) && (child.cardFlag || 
+                (child.getTexture && child.getTexture() && child.getTexture().url && 
+                 child.getTexture().url.indexOf("card") >= 0))) {
+                child.removeFromParent(true);
+            }
         }
-    })
-));
-}
-
-console.log("Removed " + cardsToRemove.length + " cards from table");
-
-// Reset pot và UI khác
-if (this.potBg && this.potAmountLabel) {
-this.potAmount = 0;
-this.potAmountLabel.setString("0");
-}
+    }, 0.5);
 },
 
 // Đánh giá cơ bản cho giá trị bộ bài
@@ -3694,6 +3903,9 @@ return result;
    cc.game.onStart = function() {
 
      ScreenManager.init();
+       // Xóa cache trước khi bắt đầu
+    cc.textureCache.removeAllTextures();
+    cc.director.purgeCachedData();
     
     // Sử dụng scene riêng cho loading
     CardsLoaderScene.preload([
@@ -3713,6 +3925,8 @@ return result;
         startScene.init();
         cc.director.runScene(startScene);
         console.log("Loading complete, showing Start Screen");
+
+        cc.sys.garbageCollect();
     });
 
 
@@ -3879,6 +4093,12 @@ return result;
     //   }
     });
        
+       // Thêm xử lý định kỳ cho thiết bị di động
+       if (cc.sys.os === cc.sys.OS_ANDROID || cc.sys.os === cc.sys.OS_IOS) {
+        setInterval(function() {
+            gameUtils.forceGarbageCollection();
+        }, 30000); // 30 giây
+    }
 
            // Khởi tạo MyScene sau khi load xong 
 };
