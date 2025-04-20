@@ -354,6 +354,8 @@ window.initCocosGame = function(){
             
             return true;
         },
+
+        
         
         updatePositions: function() {
             var winSize = cc.director.getWinSize();
@@ -3882,6 +3884,97 @@ return result;
 
            // Khởi tạo MyScene sau khi load xong 
 };
+
+// Định nghĩa GameBridge ngay sau khi các Scene đã được định nghĩa
+window.GameBridge = {
+    // Trạng thái hiện tại của game
+    currentScene: null,
+    gameInitialized: false,
+    isPaused: false,
+    
+    // Hàm khởi tạo game
+    initGame: function() {
+        console.log("GameBridge: Khởi tạo game");
+        this.gameInitialized = true;
+        
+        // Gọi hàm khởi tạo game gốc (đã có trong ladipage-start.js)
+        window.initCocosGame();
+    },
+    
+    // Ghi nhận scene hiện tại
+    setCurrentScene: function(sceneName) {
+        console.log("GameBridge: Scene chuyển sang " + sceneName);
+        this.currentScene = sceneName;
+        
+        // Thông báo cho index.html biết về sự thay đổi scene
+        if (typeof window.onGameSceneChanged === 'function') {
+            window.onGameSceneChanged(sceneName);
+        }
+    },
+    
+    // Tạm dừng game và chuyển về StartScene nếu có thể
+    pauseGame: function() {
+        console.log("GameBridge: Tạm dừng game");
+        this.isPaused = true;
+        
+        if (typeof cc !== 'undefined' && cc.director) {
+            try {
+                cc.director.pause();
+                // Thử chuyển về StartScene nếu đang trong game
+                if (this.currentScene !== "StartScene") {
+                    this.returnToStartScene();
+                }
+            } catch (e) {
+                console.error("GameBridge: Lỗi khi pause game", e);
+            }
+        }
+        
+        // Thông báo ra ngoài
+        if (typeof window.onGamePaused === 'function') {
+            window.onGamePaused(this.currentScene === "StartScene");
+        }
+    },
+    
+    // Tiếp tục game từ trạng thái tạm dừng
+    resumeGame: function() {
+        console.log("GameBridge: Tiếp tục game");
+        this.isPaused = false;
+        
+        if (typeof cc !== 'undefined' && cc.director) {
+            cc.director.resume();
+        }
+        
+        // Thông báo ra ngoài
+        if (typeof window.onGameResumed === 'function') {
+            window.onGameResumed();
+        }
+    },
+    
+    // Phương thức đơn giản trở lại StartScene 
+    returnToStartScene: function() {
+        console.log("GameBridge: Đang chuyển về StartScene");
+        
+        if (typeof cc === 'undefined' || !cc.director) {
+            console.error("cc hoặc cc.director không tồn tại");
+            return false;
+        }
+        
+        try {
+            // Trực tiếp sử dụng StartScene đã được định nghĩa trong file này
+            var startScene = new StartScene();
+            startScene.init();
+            cc.director.runScene(startScene);
+            this.setCurrentScene("StartScene");
+            return true;
+        } catch (e) {
+            console.error("Lỗi khi tạo StartScene:", e);
+            return false;
+        }
+    }
+};
+
+// Thông báo cho index.html biết rằng GameBridge đã sẵn sàng
+document.dispatchEvent(new Event('gameBridgeReady'));
 
 cc.game.run("gameCanvas");
 };
