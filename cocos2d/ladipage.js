@@ -322,7 +322,7 @@ window.initCocosGame = function(){
             ));
             
             // Thêm tiêu đề game
-            this.titleLabel = new cc.LabelTTF("POKER CHALLENGE", "Arial Bold", 70);
+            this.titleLabel = new cc.LabelTTF("POKER AOF/NLH", "Arial Bold", 60);
             this.titleLabel.setPosition(0, 250);
             this.titleLabel.setColor(cc.color(255, 215, 0)); // Màu vàng
             
@@ -383,7 +383,7 @@ window.initCocosGame = function(){
             button.setScale(1.5);
             
             // Thêm text "START"
-            var startLabel = new cc.LabelTTF("START GAME", "Arial Bold", 50);
+            var startLabel = new cc.LabelTTF("START GAME", "Arial Bold", 32);
             startLabel.setPosition(button.width/2, button.height/2);
             startLabel.setColor(cc.color(255, 255, 255));
             button.addChild(startLabel);
