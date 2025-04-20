@@ -598,7 +598,7 @@ var MyScene = cc.Scene.extend({
         };
         
         // Thiết lập background và table
-        var background = new cc.Sprite("https://replay.x-game.net/v2/assets/resources/native/fe/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg");
+        var background = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg");
         background.setPosition(size.width / 2, size.height / 2);
         var bgScale = calculateScale(background.width, background.height);
         background.setScale(bgScale);
