@@ -322,7 +322,7 @@ window.initCocosGame = function(){
             ));
             
             // Thêm tiêu đề game
-            this.titleLabel = new cc.LabelTTF("POKER CHALLENGE", "Arial Bold", 70);
+            this.titleLabel = new cc.LabelTTF("POKER AOF/NLH", "Arial Bold", 60);
             this.titleLabel.setPosition(0, 250);
             this.titleLabel.setColor(cc.color(255, 215, 0)); // Màu vàng
             
@@ -383,7 +383,7 @@ window.initCocosGame = function(){
             button.setScale(1.5);
             
             // Thêm text "START"
-            var startLabel = new cc.LabelTTF("START GAME", "Arial Bold", 50);
+            var startLabel = new cc.LabelTTF("START GAME", "Arial Bold", 32);
             startLabel.setPosition(button.width/2, button.height/2);
             startLabel.setColor(cc.color(255, 255, 255));
             button.addChild(startLabel);
@@ -3700,7 +3700,7 @@ return result;
     // Sử dụng scene riêng cho loading
     CardsLoaderScene.preload([
         "HelloWorld.png", 
-        "https://replay.x-game.net/v2/assets/resources/native/fe/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg",
+        "https://tuancho670.github.io/Web-App/assets/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg",
         "https://tuancho670.github.io/Web-App/assets/0f1f7e3e-05c6-47e8-9444-d517276d37d1.png",
         "https://replay.x-game.net/v2/assets/resources/native/12/1206c74af.png",
         "https://replay.x-game.net/v2/assets/resources/native/1c/1c46648e0.png",
