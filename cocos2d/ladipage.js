@@ -4420,35 +4420,66 @@ window.GameBackEndBridge = {
     },
     
     // Đồng bộ điểm sau khi kết thúc ván đấu
-    syncGameResult(winner, pot) {
-        // Tính toán số điểm thay đổi dựa trên kết quả
-        let pointsChange = 0;
+   // Đồng bộ điểm sau khi kết thúc ván đấu
+syncGameResult(winner, pot) {
+    const currentScene = cc.director.getRunningScene();
+    if (!currentScene || !currentScene.gameState) {
+        console.error("Không thể đồng bộ kết quả: không tìm thấy scene hiện tại");
+        return;
+    }
+    
+    // Tính toán số điểm thay đổi dựa trên kết quả
+    let pointsChange = 0;
+    
+    if (winner === "player") {
+        // Người chơi thắng, tính điểm cộng
+        const amountAfterFee = pot * 0.96;
+        pointsChange = Math.floor(amountAfterFee);
+        console.log("Người chơi thắng, cộng điểm:", pointsChange);
+    } else if (winner === "ai") {
+        // AI thắng, người chơi thua, tính điểm trừ
+        // Lấy thông tin về ante (số chip đã đặt vào pot)
+        const ante = currentScene.gameState.minBet * 2; // Thông thường ante là 2 * minBet
+        pointsChange = -ante;
+        console.log("AI thắng, trừ điểm:", pointsChange);
+    } else if (winner === "tie") {
+        // Hòa, không thay đổi điểm
+        console.log("Ván hòa, không thay đổi điểm");
+        return; // Không cần cập nhật
+    }
+    
+    // Kiểm tra chi tiết thay đổi điểm
+    console.log("Chi tiết thay đổi điểm:", {
+        winner: winner,
+        pot: pot,
+        pointsChange: pointsChange,
+        playerStack: currentScene.gameState.playerStack,
+        playerDefaultStack: currentScene.gameState.playerDefaultStack
+    });
+    
+    // Chỉ cập nhật nếu có thay đổi điểm
+    if (pointsChange !== 0) {
+        // Cập nhật wallet trong game trước để UI hiển thị ngay
+        currentScene.gameState.playerWallet += pointsChange;
+        currentScene.displayWalletInfo();
         
-        if (winner === "player") {
-            // Người chơi thắng, tính điểm cộng
-            const amountAfterFee = pot * 0.96;
-            pointsChange = Math.floor(amountAfterFee);
-        } else if (winner === "ai") {
-            // AI thắng, người chơi thua, tính điểm trừ
-            // Lấy MyScene hiện tại để tính điểm thua
-            const currentScene = cc.director.getRunningScene();
-            if (currentScene && currentScene.gameState) {
-                const lostAmount = currentScene.gameState.playerDefaultStack - currentScene.gameState.playerStack;
-                pointsChange = -Math.floor(lostAmount);
-            }
-        }
-        
-        // Chỉ cập nhật nếu có thay đổi điểm
-        if (pointsChange !== 0) {
-            this.updateGamePoints(pointsChange)
-                .then(result => {
-                    console.log("Đã đồng bộ điểm Game sau ván đấu:", result.newPoints);
-                })
-                .catch(err => {
-                    console.error("Lỗi khi đồng bộ điểm Game sau ván đấu:", err);
-                });
-        }
-    },
+        // Gửi cập nhật lên server
+        this.updateGamePoints(pointsChange)
+            .then(result => {
+                console.log("Đã đồng bộ điểm Game sau ván đấu:", result);
+                
+                // Nếu có sự khác biệt giữa server và client, cập nhật lại client
+                if (result.success && result.newPoints !== currentScene.gameState.playerWallet) {
+                    console.log("Đồng bộ lại ví từ server:", result.newPoints);
+                    currentScene.gameState.playerWallet = result.newPoints;
+                    currentScene.displayWalletInfo();
+                }
+            })
+            .catch(err => {
+                console.error("Lỗi khi đồng bộ điểm Game sau ván đấu:", err);
+            });
+    }
+},
     
     // Phương thức khởi tạo cho bridge
     initialize() {
@@ -4472,42 +4503,47 @@ window.GameBackEndBridge = {
     },
     
     // Tích hợp với MyScene
-    integrateWithGameScene() {
-        if (!window.MyScene || !MyScene.prototype) return;
+// Thay đổi trong hàm integrateWithGameScene của GameBackEndBridge
+integrateWithGameScene() {
+    if (!window.MyScene || !MyScene.prototype) return;
+    
+    const self = this;
+    
+    // Lưu lại phương thức handleWinnerAnimation gốc
+    const originalHandleWinner = MyScene.prototype.handleWinnerAnimation;
+    
+    // Ghi đè để đồng bộ điểm với server sau khi kết thúc ván đấu
+    MyScene.prototype.handleWinnerAnimation = function(winner, resultMessage, potContainer) {
+        console.log("handleWinnerAnimation được gọi với:", winner, "pot:", this.gameState.pot);
         
-        const self = this;
+        // Gọi phương thức gốc trước
+        originalHandleWinner.call(this, winner, resultMessage, potContainer);
         
-        // Lưu lại phương thức handleWinnerAnimation gốc
-        const originalHandleWinner = MyScene.prototype.handleWinnerAnimation;
+        // Đồng bộ điểm với server
+        self.syncGameResult(winner, this.gameState.pot);
+    };
+    
+    // Sửa đổi balancePlayerStack để đồng bộ với server
+    const originalBalancePlayer = MyScene.prototype.balancePlayerStack;
+    
+    MyScene.prototype.balancePlayerStack = function() {
+        console.log("balancePlayerStack được gọi");
         
-        // Ghi đè để đồng bộ điểm với server sau khi kết thúc ván đấu
-        MyScene.prototype.handleWinnerAnimation = function(winner, resultMessage, potContainer) {
-            // Gọi phương thức gốc trước
-            originalHandleWinner.call(this, winner, resultMessage, potContainer);
-            
-            // Đồng bộ điểm với server
-            self.syncGameResult(winner, this.gameState.pot);
-        };
+        // Gọi phương thức gốc trước
+        originalBalancePlayer.call(this);
         
-        // Sửa đổi balancePlayerStack để đồng bộ với server
-        const originalBalancePlayer = MyScene.prototype.balancePlayerStack;
-        
-        MyScene.prototype.balancePlayerStack = function() {
-            // Gọi phương thức gốc trước
-            originalBalancePlayer.call(this);
-            
-            // Kiểm tra và đồng bộ ví định kỳ
-            self.getGamePoints()
-                .then(result => {
-                    console.log("Đã kiểm tra và đồng bộ ví game");
-                })
-                .catch(err => {
-                    console.error("Lỗi khi đồng bộ ví game:", err);
-                });
-        };
-        
-        console.log("Đã tích hợp GameBackEndBridge với MyScene");
-    }
+        // Kiểm tra và đồng bộ ví định kỳ
+        self.getGamePoints()
+            .then(result => {
+                console.log("Đã kiểm tra và đồng bộ ví game");
+            })
+            .catch(err => {
+                console.error("Lỗi khi đồng bộ ví game:", err);
+            });
+    };
+    
+    console.log("Đã tích hợp GameBackEndBridge với MyScene");
+}
 };
 
 // Khởi tạo GameBackEndBridge sau khi trang đã load hoàn tất
