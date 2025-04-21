@@ -4487,8 +4487,8 @@ async updateWalletDirectly(newAmount) {
     }
 },
     
-    // Đồng bộ điểm sau khi kết thúc ván đấu
-   // Đồng bộ điểm sau khi kết thúc ván đấu
+
+// Đồng bộ điểm sau khi kết thúc ván đấu
 syncGameResult(winner, pot) {
     const currentScene = cc.director.getRunningScene();
     if (!currentScene || !currentScene.gameState) {
@@ -4506,9 +4506,8 @@ syncGameResult(winner, pot) {
         console.log("Người chơi thắng, cộng điểm:", pointsChange);
     } else if (winner === "ai") {
         // AI thắng, người chơi thua, tính điểm trừ
-        // Lấy thông tin về ante (số chip đã đặt vào pot)
-        const ante = currentScene.gameState.minBet * 2; // Thông thường ante là 2 * minBet
-        pointsChange = -ante;
+        const lostAmount = currentScene.gameState.playerDefaultStack - currentScene.gameState.playerStack;
+        pointsChange = -Math.floor(lostAmount);
         console.log("AI thắng, trừ điểm:", pointsChange);
     } else if (winner === "tie") {
         // Hòa, không thay đổi điểm
@@ -4516,7 +4515,6 @@ syncGameResult(winner, pot) {
         return; // Không cần cập nhật
     }
     
-    // Kiểm tra chi tiết thay đổi điểm
     console.log("Chi tiết thay đổi điểm:", {
         winner: winner,
         pot: pot,
@@ -4531,20 +4529,13 @@ syncGameResult(winner, pot) {
         currentScene.gameState.playerWallet += pointsChange;
         currentScene.displayWalletInfo();
         
-        // Gửi cập nhật lên server
-        this.updateGamePoints(pointsChange)
+        // ***QUAN TRỌNG: Cập nhật ví trực tiếp về sheet***
+        this.updateWalletDirectly(currentScene.gameState.playerWallet)
             .then(result => {
-                console.log("Đã đồng bộ điểm Game sau ván đấu:", result);
-                
-                // Nếu có sự khác biệt giữa server và client, cập nhật lại client
-                if (result.success && result.newPoints !== currentScene.gameState.playerWallet) {
-                    console.log("Đồng bộ lại ví từ server:", result.newPoints);
-                    currentScene.gameState.playerWallet = result.newPoints;
-                    currentScene.displayWalletInfo();
-                }
+                console.log("Đã cập nhật số dư ví về server:", result);
             })
             .catch(err => {
-                console.error("Lỗi khi đồng bộ điểm Game sau ván đấu:", err);
+                console.error("Lỗi khi cập nhật số dư ví:", err);
             });
     }
 },
