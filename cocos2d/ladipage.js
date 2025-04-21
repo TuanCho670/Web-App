@@ -573,153 +573,246 @@ var MyScene = cc.Scene.extend({
     // INITIALIZATION METHODS
     //------------------------------------------------------------------------
     
-    // Called when scene is initialized
-   // Called when scene is initialized
-// Called when scene is initialized
-onEnter: function() {
-    this._super();
-    var size = cc.director.getWinSize();
+    onEnter: function() {
+        this._super();
+        var size = cc.director.getWinSize();
+        var self = this;
+        
+        console.log("Scene entered - initializing game");
+        
+        // Flag để ngăn xử lý chồng chéo
+        this.isGameInProgress = false;
+        
+        // Tính toán scale dựa vào kích thước thực tế
+        var calculateScale = function(imageWidth, imageHeight) {
+            var scaleX = size.width / imageWidth;
+            var scaleY = size.height / imageHeight;
+            
+            // Xác định scale phù hợp dựa vào thiết bị
+            if (cc.sys.isMobile) {
+                return Math.max(scaleX, scaleY);
+            } else {
+                return Math.min(scaleX, scaleY) + 0.1;
+            }
+        };
+        
+        // Thiết lập background và table
+        var background = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg");
+        background.setPosition(size.width / 2, size.height / 2);
+        var bgScale = calculateScale(background.width, background.height);
+        background.setScale(bgScale);
+        this.addChild(background, 0);
+        
+        var table = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/0f1f7e3e-05c6-47e8-9444-d517276d37d1.png");
+        table.setPosition(size.width / 2, size.height / 2);
+        this.tableScale = calculateScale(table.width, table.height);
+        table.setScale(this.tableScale);
+        this.addChild(table, 1);
+        
+        // Lưu tham chiếu đến table
+        this.table = table;
+        
+        // Khởi tạo vị trí pot
+        this.potPosition = cc.p(size.width / 2, size.height / 2 + 115);
+        
+        // Tạo thông tin người chơi
+        this.createPlayers();
+        
+        var centerX = size.width / 2;
+        var buttonSpacing = 120; // khoảng cách ngang
+        var yPos = 60; // khoảng cách từ đáy màn hình
+    
+        this.foldButton = this.createActionButton(centerX - buttonSpacing, yPos, 'fold');
+        this.addChild(this.foldButton, 10);
+    
+        this.allinButton = this.createActionButton(centerX + buttonSpacing, yPos, 'allin');
+        this.addChild(this.allinButton, 10);
+        
+        // Khởi tạo pot trống
+        this.initPot();
+        
+        // Preload âm thanh
+        this.soundManager.preloadAll();
+        
+        // Tạo và hiển thị loading indicator
+        var loadingLabel = new cc.LabelTTF("Đang tải dữ liệu ví...", "Arial Bold", 32 * this.tableScale);
+        loadingLabel.setPosition(size.width / 2, size.height / 2);
+        loadingLabel.setColor(cc.color(255, 255, 255));
+        
+        // Thêm shadow để dễ đọc
+        loadingLabel.enableShadow(cc.color(0, 0, 0, 255), cc.size(2, 2), 3);
+        
+        this.addChild(loadingLabel, 100);
+        
+        // Thêm hiệu ứng đợi để tăng trải nghiệm người dùng
+        var dots = ".";
+        loadingLabel.schedule(function() {
+            dots = dots.length >= 3 ? "." : dots + ".";
+            loadingLabel.setString("Đang tải dữ liệu ví" + dots);
+        }, 0.5);
+        
+        // Kiểm tra nếu có GameBackEndBridge
+        if (window.GameBackEndBridge) {
+            // Tải điểm từ server
+            window.GameBackEndBridge.getGamePoints()
+                .then(function(result) {
+                    console.log("Kết quả lấy điểm từ server:", result);
+                    
+                    if (result.success) {
+                        // Cập nhật ví người chơi từ server
+                        self.gameState.playerWallet = result.points;
+                        console.log("Đã cập nhật ví người chơi:", self.gameState.playerWallet);
+                        
+                        // Đặt stack về 0 ban đầu để đảm bảo trừ chính xác từ ví
+                        self.gameState.playerStack = 0;
+                        
+                        // Hiển thị thông tin ví
+                        self.displayWalletInfo();
+                        
+                        // Kiểm tra số dư ví để quyết định luồng tiếp theo
+                        if (self.gameState.playerWallet >= self.gameState.playerDefaultStack) {
+                            // Có đủ tiền trong ví, tiến hành trừ tiền và bắt đầu game
+                            loadingLabel.unscheduleAllCallbacks();
+                            loadingLabel.removeFromParent(true);
+                            
+                            // Bắt đầu ván mới sau khi kiểm tra đủ điều kiện
+                            self.scheduleOnce(function() {
+                                console.log("Starting new hand after wallet check");
+                                self.startNewHand();
+                                self.isGameInProgress = false;
+                            }, 0.5);
+                        } else if (self.gameState.playerWallet > 0) {
+                            // Không đủ tiền, nhưng có tiền - hiển thị thông báo
+                            loadingLabel.unscheduleAllCallbacks();
+                            loadingLabel.setString("Số dư không đủ! Cần " + 
+                                                 self.gameState.playerDefaultStack + 
+                                                 " chip để chơi. Bạn có " + 
+                                                 self.gameState.playerWallet + " chip.");
+                            
+                            // Tự động ẩn sau 3 giây
+                            self.scheduleOnce(function() {
+                                loadingLabel.removeFromParent(true);
+                                
+                                // Bắt đầu ván mới với số tiền hiện có
+                                self.startNewHand();
+                                self.isGameInProgress = false;
+                            }, 3.0);
+                        } else {
+                            // Ví rỗng, hiển thị thông báo nạp tiền
+                            loadingLabel.unscheduleAllCallbacks();
+                            loadingLabel.setString("Ví của bạn rỗng! Vui lòng nạp thêm CEXCOIN để chơi.");
+                            
+                            // Tạo nút nạp tiền
+                            var rechargeButton = self.createRechargeButton(size.width / 2, size.height / 2 - 80);
+                            self.addChild(rechargeButton, 101);
+                            
+                            // Không tự động ẩn thông báo
+                        }
+                    } else {
+                        // Lỗi từ server, sử dụng giá trị mặc định
+                        console.warn("Không thể lấy điểm từ server, sử dụng giá trị mặc định");
+                        loadingLabel.unscheduleAllCallbacks();
+                        loadingLabel.removeFromParent(true);
+                        
+                        // Hiển thị thông tin ví
+                        self.displayWalletInfo();
+                        
+                        // Bắt đầu ván mới
+                        self.scheduleOnce(function() {
+                            console.log("Starting new hand with default wallet value");
+                            self.startNewHand();
+                            self.isGameInProgress = false;
+                        }, 0.5);
+                    }
+                })
+                .catch(function(error) {
+                    console.error("Lỗi khi lấy điểm từ server:", error);
+                    
+                    // Hiển thị thông báo lỗi
+                    loadingLabel.unscheduleAllCallbacks();
+                    loadingLabel.setString("Không thể kết nối đến server. Đang sử dụng dữ liệu offline.");
+                    
+                    // Tự động xóa thông báo sau 2 giây
+                    self.scheduleOnce(function() {
+                        loadingLabel.removeFromParent(true);
+                        
+                        // Hiển thị thông tin ví với giá trị mặc định
+                        self.displayWalletInfo();
+                        
+                        // Bắt đầu ván mới
+                        console.log("Starting new hand with default wallet value");
+                        self.startNewHand();
+                        self.isGameInProgress = false;
+                    }, 2.0);
+                });
+        } else {
+            console.warn("GameBackEndBridge không tồn tại, sử dụng giá trị mặc định");
+            
+            // Xóa loading label ngay lập tức
+            loadingLabel.removeFromParent(true);
+            
+            // Hiển thị thông tin ví
+            self.displayWalletInfo();
+            
+            // Bắt đầu ván mới
+            self.scheduleOnce(function() {
+                console.log("Starting new hand with default wallet value");
+                self.startNewHand();
+                self.isGameInProgress = false;
+            }, 0.5);
+        }
+    },
+
+    // Thêm phương thức tạo nút nạp tiền
+createRechargeButton: function(x, y) {
     var self = this;
     
-    console.log("Scene entered - initializing game");
+    // Tạo button
+    var button = new ccui.Button();
+    button.loadTextures(
+        "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_yellow.png",
+        "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_yellow.png",
+        "https://tuancho670.github.io/Web-App/assets/Button_tag/btn_table_yellow.png"
+    );
+    button.setPosition(cc.p(x, y));
+    button.setScale(this.tableScale * 1.5);
     
-    // Flag để ngăn xử lý chồng chéo
-    this.isGameInProgress = false;
+    // Thêm text "NẠP CEXCOIN"
+    var label = new cc.LabelTTF("NẠP CEXCOIN", "Arial Bold", 32);
+    label.setPosition(button.width/2, button.height/2);
+    label.setColor(cc.color(255, 255, 255));
+    button.addChild(label);
     
-    // Tính toán scale dựa vào kích thước thực tế
-    var calculateScale = function(imageWidth, imageHeight) {
-        var scaleX = size.width / imageWidth;
-        var scaleY = size.height / imageHeight;
-        
-        // Xác định scale phù hợp dựa vào thiết bị
-        if (cc.sys.isMobile) {
-            return Math.max(scaleX, scaleY);
-        } else {
-            return Math.min(scaleX, scaleY) + 0.1;
+    // Thêm animation
+    var scaleAction = cc.RepeatForever.create(
+        cc.Sequence.create(
+            cc.ScaleTo.create(0.5, this.tableScale * 1.6),
+            cc.ScaleTo.create(0.5, this.tableScale * 1.5)
+        )
+    );
+    button.runAction(scaleAction);
+    
+    // Thiết lập callback cho button
+    button.addTouchEventListener(function(sender, type) {
+        if (type === ccui.Widget.TOUCH_ENDED) {
+            console.log("Recharge button clicked!");
+            
+            // Phát âm thanh khi nhấp nút
+            self.soundManager.play("button");
+            
+            // Gọi TelegramWebApp để mở menu chính
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.close();
+            } else {
+                // Fallback: Hiển thị alert nếu không có Telegram WebApp
+                alert("Vui lòng quay lại và làm nhiệm vụ để nhận thêm CEXCOIN!");
+            }
         }
-    };
+    }, this);
     
-    // Thiết lập background và table
-    var background = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg");
-    background.setPosition(size.width / 2, size.height / 2);
-    var bgScale = calculateScale(background.width, background.height);
-    background.setScale(bgScale);
-    this.addChild(background, 0);
-    
-    var table = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/0f1f7e3e-05c6-47e8-9444-d517276d37d1.png");
-    table.setPosition(size.width / 2, size.height / 2);
-    this.tableScale = calculateScale(table.width, table.height);
-    table.setScale(this.tableScale);
-    this.addChild(table, 1);
-    
-    // Lưu tham chiếu đến table
-    this.table = table;
-    
-    // Khởi tạo vị trí pot
-    this.potPosition = cc.p(size.width / 2, size.height / 2 + 115);
-    
-    // Tạo thông tin người chơi
-    this.createPlayers();
-    
-    var centerX = size.width / 2;
-    var buttonSpacing = 120; // khoảng cách ngang
-    var yPos = 60; // khoảng cách từ đáy màn hình
-
-    this.foldButton = this.createActionButton(centerX - buttonSpacing, yPos, 'fold');
-    this.addChild(this.foldButton, 10);
-
-    this.allinButton = this.createActionButton(centerX + buttonSpacing, yPos, 'allin');
-    this.addChild(this.allinButton, 10);
-    
-    // Khởi tạo pot trống
-    this.initPot();
-    
-    // Preload âm thanh
-    this.soundManager.preloadAll();
-    
-    // Tạo và hiển thị loading indicator
-    var loadingLabel = new cc.LabelTTF("Đang tải dữ liệu ví...", "Arial Bold", 32 * this.tableScale);
-    loadingLabel.setPosition(size.width / 2, size.height / 2);
-    loadingLabel.setColor(cc.color(255, 255, 255));
-    
-    // Thêm shadow để dễ đọc
-    loadingLabel.enableShadow(cc.color(0, 0, 0, 255), cc.size(2, 2), 3);
-    
-    this.addChild(loadingLabel, 100);
-    
-    // Thêm hiệu ứng đợi để tăng trải nghiệm người dùng
-    var dots = ".";
-    loadingLabel.schedule(function() {
-        dots = dots.length >= 3 ? "." : dots + ".";
-        loadingLabel.setString("Đang tải dữ liệu ví" + dots);
-    }, 0.5);
-    
-    // Kiểm tra nếu có GameBackEndBridge
-    if (window.GameBackEndBridge) {
-        // Tải điểm từ server
-        window.GameBackEndBridge.getGamePoints()
-            .then(function(result) {
-                console.log("Kết quả lấy điểm từ server:", result);
-                
-                if (result.success) {
-                    // Cập nhật ví người chơi từ server
-                    self.gameState.playerWallet = result.points;
-                    console.log("Đã cập nhật ví người chơi:", self.gameState.playerWallet);
-                } else {
-                    console.warn("Không thể lấy điểm từ server, sử dụng giá trị mặc định");
-                }
-                
-                // Hiển thị thông tin ví
-                self.displayWalletInfo();
-                
-                // Xóa loading label
-                loadingLabel.unscheduleAllCallbacks();
-                loadingLabel.removeFromParent(true);
-                
-                // Bắt đầu ván mới
-                self.scheduleOnce(function() {
-                    console.log("Starting new hand after wallet data loaded");
-                    self.startNewHand();
-                    self.isGameInProgress = false;
-                }, 0.5);
-            })
-            .catch(function(error) {
-                console.error("Lỗi khi lấy điểm từ server:", error);
-                
-                // Hiển thị thông báo lỗi
-                loadingLabel.unscheduleAllCallbacks();
-                loadingLabel.setString("Không thể kết nối đến server. Đang sử dụng dữ liệu offline.");
-                
-                // Tự động xóa thông báo sau 2 giây
-                self.scheduleOnce(function() {
-                    loadingLabel.removeFromParent(true);
-                    
-                    // Hiển thị thông tin ví với giá trị mặc định
-                    self.displayWalletInfo();
-                    
-                    // Bắt đầu ván mới
-                    console.log("Starting new hand with default wallet value");
-                    self.startNewHand();
-                    self.isGameInProgress = false;
-                }, 2.0);
-            });
-    } else {
-        console.warn("GameBackEndBridge không tồn tại, sử dụng giá trị mặc định");
-        
-        // Xóa loading label ngay lập tức
-        loadingLabel.removeFromParent(true);
-        
-        // Hiển thị thông tin ví
-        self.displayWalletInfo();
-        
-        // Bắt đầu ván mới
-        self.scheduleOnce(function() {
-            console.log("Starting new hand with default wallet value");
-            self.startNewHand();
-            self.isGameInProgress = false;
-        }, 0.5);
-    }
+    return button;
 },
+    
     
     // Tạo thông tin người chơi
     createPlayers: function() {
@@ -990,15 +1083,36 @@ console.log("Cannot show buttons - not initialized");
     startNewHand: function() {
         var self = this;
         console.log("Starting new hand");
-
+    
         this.buttonsHiddenManually = false;
         
-        // Đảm bảo nạp lại chip
-        this.refillPlayerStack();
-        this.refillAIStack();
+        // Đảm bảo trừ tiền từ ví cho lần chơi đầu tiên
+        var refillSuccess = this.refillPlayerStack();
         
-        // Cân bằng stack
-        this.balancePlayerStack();
+        // Chỉ tiếp tục nếu refill thành công hoặc đã có đủ chip
+        if (!refillSuccess && this.gameState.playerStack < this.gameState.playerDefaultStack) {
+            console.log("Not enough chips to start a new hand");
+            
+            // Hiển thị thông báo không đủ chip
+            var size = cc.director.getWinSize();
+            var notEnoughLabel = new cc.LabelTTF(
+                "Số chip không đủ để chơi! Bạn cần " + this.gameState.playerDefaultStack + " chip.",
+                "Arial Bold", 32 * this.tableScale
+            );
+            notEnoughLabel.setPosition(size.width / 2, size.height / 2);
+            notEnoughLabel.setColor(cc.color(255, 100, 100));
+            notEnoughLabel.enableShadow(cc.color(0, 0, 0, 255), cc.size(2, 2), 3);
+            this.addChild(notEnoughLabel, 100);
+            
+            // Tạo nút nạp tiền
+            var rechargeButton = this.createRechargeButton(size.width / 2, size.height / 2 - 80);
+            this.addChild(rechargeButton, 101);
+            
+            return;
+        }
+        
+        // Cân bằng stack cho AI
+        this.refillAIStack();
         this.balanceAIStack();
         
         // Cập nhật hiển thị
@@ -2540,36 +2654,40 @@ this.addChild(this.walletLabel, 10);
 },
 
 // Nạp lại chip cho người chơi
+// Sửa lại hàm refillPlayerStack để kiểm tra số dư ví và trả về trạng thái thành công/thất bại
 refillPlayerStack: function() {
-// Kiểm tra xem người chơi có đủ chip mặc định không
-if (this.gameState.playerStack < this.gameState.playerDefaultStack) {
-console.log("Player stack is below default amount, refilling from wallet");
+    // Kiểm tra xem người chơi có đủ chip mặc định không
+    if (this.gameState.playerStack < this.gameState.playerDefaultStack) {
+        console.log("Player stack is below default amount, attempting to refill from wallet");
 
-var amountNeeded = this.gameState.playerDefaultStack - this.gameState.playerStack;
-console.log("Amount needed to refill:", amountNeeded);
+        var amountNeeded = this.gameState.playerDefaultStack - this.gameState.playerStack;
+        console.log("Amount needed to refill:", amountNeeded);
 
-// Kiểm tra xem wallet có đủ chip để nạp không
-if (this.gameState.playerWallet >= amountNeeded) {
-    // Trừ chip từ ví để nạp vào stack
-    this.gameState.playerWallet -= amountNeeded;
-    this.gameState.playerStack = this.gameState.playerDefaultStack;
-    
-    console.log("Refilled player stack to:", this.gameState.playerDefaultStack);
-    console.log("Player wallet remaining:", this.gameState.playerWallet);
-} else if (this.gameState.playerWallet > 0) {
-    // Nếu ví còn chip nhưng không đủ, nạp số còn lại
-    this.gameState.playerStack += this.gameState.playerWallet;
-    this.gameState.playerWallet = 0;
-    
-    console.log("Partially refilled player stack to:", this.gameState.playerStack);
-    console.log("Player wallet is now empty");
-} else {
-    console.log("Cannot refill player stack: wallet is empty");
-    // Có thể hiển thị thông báo hoặc kết thúc trò chơi ở đây
-}
-} else {
-console.log("Player stack is already at or above default amount, no refill needed");
-}
+        // Kiểm tra xem wallet có đủ chip để nạp không
+        if (this.gameState.playerWallet >= amountNeeded) {
+            // Trừ chip từ ví để nạp vào stack
+            this.gameState.playerWallet -= amountNeeded;
+            this.gameState.playerStack = this.gameState.playerDefaultStack;
+            
+            console.log("Refilled player stack to:", this.gameState.playerDefaultStack);
+            console.log("Player wallet remaining:", this.gameState.playerWallet);
+            return true; // Refill thành công
+        } else if (this.gameState.playerWallet > 0) {
+            // Nếu ví còn chip nhưng không đủ, nạp số còn lại
+            this.gameState.playerStack += this.gameState.playerWallet;
+            this.gameState.playerWallet = 0;
+            
+            console.log("Partially refilled player stack to:", this.gameState.playerStack);
+            console.log("Player wallet is now empty");
+            return false; // Refill không đủ
+        } else {
+            console.log("Cannot refill player stack: wallet is empty");
+            return false; // Không thể refill
+        }
+    } else {
+        console.log("Player stack is already at or above default amount, no refill needed");
+        return true; // Không cần refill
+    }
 },
 
 // AI luôn tự động nạp lại đủ stack
