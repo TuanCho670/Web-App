@@ -574,81 +574,138 @@ var MyScene = cc.Scene.extend({
     //------------------------------------------------------------------------
     
     // Called when scene is initialized
-    onEnter: function() {
-        this._super();
-        var size = cc.director.getWinSize();
-        var self = this;
-        
-        console.log("Scene entered - initializing game");
-        
-        // Flag để ngăn xử lý chồng chéo
-        this.isGameInProgress = false;
-        
-        // Hiển thị số chip trong ví
-        this.displayWalletInfo();
-        
-        // Tính toán scale dựa vào kích thước thực tế
-        var calculateScale = function(imageWidth, imageHeight) {
-            var scaleX = size.width / imageWidth;
-            var scaleY = size.height / imageHeight;
-            
-            // Xác định scale phù hợp dựa vào thiết bị
-            if (cc.sys.isMobile) {
-                return Math.max(scaleX, scaleY);
-            } else {
-                return Math.min(scaleX, scaleY) + 0.1;
-            }
-        };
-        
-        // Thiết lập background và table
-        var background = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg");
-        background.setPosition(size.width / 2, size.height / 2);
-        var bgScale = calculateScale(background.width, background.height);
-        background.setScale(bgScale);
-        this.addChild(background, 0);
-        
-        var table = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/0f1f7e3e-05c6-47e8-9444-d517276d37d1.png");
-        table.setPosition(size.width / 2, size.height / 2);
-        this.tableScale = calculateScale(table.width, table.height);
-        table.setScale(this.tableScale);
-        this.addChild(table, 1);
-        
-        // Lưu tham chiếu đến table
-        this.table = table;
-        
-        // Khởi tạo vị trí pot
-        this.potPosition = cc.p(size.width / 2, size.height / 2 + 115);
-        
-        // Tạo thông tin người chơi
-        this.createPlayers();
-        
-        var size = cc.director.getWinSize();
-var centerX = size.width / 2;
-var buttonSpacing = 120; // khoảng cách ngang
-var yPos = 60; // khoảng cách từ đáy màn hình
+   // Called when scene is initialized
+onEnter: function() {
+    this._super();
+    var size = cc.director.getWinSize();
+    var self = this;
+    
+    console.log("Scene entered - initializing game");
+    
+    // Flag để ngăn xử lý chồng chéo
+    this.isGameInProgress = false;
+    
+    // Thiết lập background và table
+    var background = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg");
+    background.setPosition(size.width / 2, size.height / 2);
+    var bgScale = this.calculateScale(background.width, background.height);
+    background.setScale(bgScale);
+    this.addChild(background, 0);
+    
+    var table = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/0f1f7e3e-05c6-47e8-9444-d517276d37d1.png");
+    table.setPosition(size.width / 2, size.height / 2);
+    this.tableScale = this.calculateScale(table.width, table.height);
+    table.setScale(this.tableScale);
+    this.addChild(table, 1);
+    
+    // Lưu tham chiếu đến table
+    this.table = table;
+    
+    // Khởi tạo vị trí pot
+    this.potPosition = cc.p(size.width / 2, size.height / 2 + 115);
+    
+    // Tạo thông tin người chơi
+    this.createPlayers();
+    
+    var centerX = size.width / 2;
+    var buttonSpacing = 120; // khoảng cách ngang
+    var yPos = 60; // khoảng cách từ đáy màn hình
 
-this.foldButton = this.createActionButton(centerX - buttonSpacing, yPos, 'fold');
-this.addChild(this.foldButton, 10);
+    this.foldButton = this.createActionButton(centerX - buttonSpacing, yPos, 'fold');
+    this.addChild(this.foldButton, 10);
 
-this.allinButton = this.createActionButton(centerX + buttonSpacing, yPos, 'allin');
-this.addChild(this.allinButton, 10);
-
-
-
+    this.allinButton = this.createActionButton(centerX + buttonSpacing, yPos, 'allin');
+    this.addChild(this.allinButton, 10);
+    
+    // Khởi tạo pot trống
+    this.initPot();
+    
+    // Preload âm thanh
+    this.soundManager.preloadAll();
+    
+    // Tạo và hiển thị loading indicator
+    var loadingLabel = new cc.LabelTTF("Đang tải dữ liệu ví...", "Arial Bold", 32 * this.tableScale);
+    loadingLabel.setPosition(size.width / 2, size.height / 2);
+    loadingLabel.setColor(cc.color(255, 255, 255));
+    
+    // Thêm shadow để dễ đọc
+    loadingLabel.enableShadow(cc.color(0, 0, 0, 255), cc.size(2, 2), 3);
+    
+    this.addChild(loadingLabel, 100);
+    
+    // Thêm hiệu ứng đợi để tăng trải nghiệm người dùng
+    var dots = ".";
+    loadingLabel.schedule(function() {
+        dots = dots.length >= 3 ? "." : dots + ".";
+        loadingLabel.setString("Đang tải dữ liệu ví" + dots);
+    }, 0.5);
+    
+    // Kiểm tra nếu có GameBackEndBridge
+    if (window.GameBackEndBridge) {
+        // Tải điểm từ server
+        window.GameBackEndBridge.getGamePoints()
+            .then(function(result) {
+                console.log("Kết quả lấy điểm từ server:", result);
+                
+                if (result.success) {
+                    // Cập nhật ví người chơi từ server
+                    self.gameState.playerWallet = result.points;
+                    console.log("Đã cập nhật ví người chơi:", self.gameState.playerWallet);
+                } else {
+                    console.warn("Không thể lấy điểm từ server, sử dụng giá trị mặc định");
+                }
+                
+                // Hiển thị thông tin ví
+                self.displayWalletInfo();
+                
+                // Xóa loading label
+                loadingLabel.unscheduleAllCallbacks();
+                loadingLabel.removeFromParent(true);
+                
+                // Bắt đầu ván mới
+                self.scheduleOnce(function() {
+                    console.log("Starting new hand after wallet data loaded");
+                    self.startNewHand();
+                    self.isGameInProgress = false;
+                }, 0.5);
+            })
+            .catch(function(error) {
+                console.error("Lỗi khi lấy điểm từ server:", error);
+                
+                // Hiển thị thông báo lỗi
+                loadingLabel.unscheduleAllCallbacks();
+                loadingLabel.setString("Không thể kết nối đến server. Đang sử dụng dữ liệu offline.");
+                
+                // Tự động xóa thông báo sau 2 giây
+                self.scheduleOnce(function() {
+                    loadingLabel.removeFromParent(true);
+                    
+                    // Hiển thị thông tin ví với giá trị mặc định
+                    self.displayWalletInfo();
+                    
+                    // Bắt đầu ván mới
+                    console.log("Starting new hand with default wallet value");
+                    self.startNewHand();
+                    self.isGameInProgress = false;
+                }, 2.0);
+            });
+    } else {
+        console.warn("GameBackEndBridge không tồn tại, sử dụng giá trị mặc định");
         
-        // Khởi tạo pot trống
-        this.initPot();
+        // Xóa loading label ngay lập tức
+        loadingLabel.removeFromParent(true);
         
-        // Preload âm thanh
-        this.soundManager.preloadAll();
+        // Hiển thị thông tin ví
+        self.displayWalletInfo();
         
-        // Một chút delay để tạo cảm giác tự nhiên hơn
-        this.scheduleOnce(function() {
-            console.log("Starting new hand from onEnter");
+        // Bắt đầu ván mới
+        self.scheduleOnce(function() {
+            console.log("Starting new hand with default wallet value");
             self.startNewHand();
             self.isGameInProgress = false;
-        }, 1.0);
-    },
+        }, 0.5);
+    }
+},
     
     // Tạo thông tin người chơi
     createPlayers: function() {
