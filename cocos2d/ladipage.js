@@ -368,6 +368,9 @@ window.initCocosGame = function(){
                 this.mainContainer.setPosition(centerPos);
             }
         },
+
+        // Thêm vào MyScene.prototype hoặc trong phương thức createPlayers
+
         
         createStartButton: function(x, y) {
             var self = this;
@@ -658,8 +661,22 @@ this.addChild(this.allinButton, 10);
         var topPlayerY = centerY + 500 * self.tableScale;
         var bottomPlayerY = centerY - 450 * self.tableScale;
         
+        // Lấy tên từ Telegram nếu có
+        var playerName = "Em Non L...";
+        if (this.telegramUser && this.telegramUser.first_name) {
+            playerName = this.telegramUser.first_name;
+            if (this.telegramUser.last_name) {
+                playerName += " " + this.telegramUser.last_name;
+            }
+            
+            // Rút gọn tên nếu quá dài
+            if (playerName.length > 10) {
+                playerName = playerName.substring(0, 7) + "...";
+            }
+        }
+        
         var topPlayer = this.createPlayerInfo(centerX, topPlayerY, "Enise Fid...", self.gameState.aiStack);
-        var bottomPlayer = this.createPlayerInfo(centerX, bottomPlayerY, "Em Non L...", self.gameState.playerStack);
+        var bottomPlayer = this.createPlayerInfo(centerX, bottomPlayerY, playerName, self.gameState.playerStack);
         
         // Lưu tham chiếu để cập nhật sau này
         this.topPlayer = topPlayer;
@@ -3696,6 +3713,11 @@ return result;
    cc.game.onStart = function() {
 
      ScreenManager.init();
+
+      // Khởi tạo Telegram Bridge
+    if (typeof window.TelegramBridge === 'object') {
+        window.TelegramBridge.initialize();
+    }
     
     // Sử dụng scene riêng cho loading
     CardsLoaderScene.preload([
@@ -3715,8 +3737,17 @@ return result;
         startScene.init();
         cc.director.runScene(startScene);
         console.log("Loading complete, showing Start Screen");
-    });
 
+        if (window.TelegramBridge) {
+            var telegramUser = window.TelegramBridge.getUserInfo();
+            console.log("Game - User info from Telegram:", telegramUser);
+            
+            // Lưu thông tin người dùng vào MyScene để sử dụng sau này
+            if (telegramUser && MyScene.prototype) {
+                MyScene.prototype.telegramUser = telegramUser;
+            }
+        }
+    });
 
     var optimizeForTablet = function() {
         var size = cc.director.getWinSize();
@@ -3970,6 +4001,80 @@ window.GameBridge = {
             console.error("Lỗi khi tạo StartScene:", e);
             return false;
         }
+    }
+};
+
+// Tích hợp Telegram Mini App API - Phiên bản đơn giản
+window.TelegramBridge = {
+    // Lưu trữ dữ liệu từ Telegram
+    userData: null,
+    initData: null,
+    tg: null,
+    
+    // Khởi tạo kết nối với Telegram Mini App API
+    initialize: function() {
+        console.log("TelegramBridge: Đang khởi tạo...");
+        
+        try {
+            // Kiểm tra xem script Telegram đã được load chưa
+            if (window.Telegram && window.Telegram.WebApp) {
+                this.connectWithTelegram();
+            } else {
+                // Nếu chưa load, thêm script Telegram Web App
+                var script = document.createElement('script');
+                script.src = 'https://telegram.org/js/telegram-web-app.js';
+                script.onload = this.connectWithTelegram.bind(this);
+                document.head.appendChild(script);
+                
+                console.log("TelegramBridge: Đang tải Telegram WebApp API...");
+            }
+        } catch (e) {
+            console.log("TelegramBridge: Lỗi khi khởi tạo", e);
+        }
+    },
+    
+    // Kết nối với Telegram sau khi đã load script
+    connectWithTelegram: function() {
+        try {
+            if (!window.Telegram || !window.Telegram.WebApp) {
+                console.log("TelegramBridge: Telegram WebApp API không có sẵn");
+                return;
+            }
+            
+            // Kết nối với API
+            this.tg = window.Telegram.WebApp;
+            
+            // Lấy thông tin người dùng
+            if (this.tg.initDataUnsafe && this.tg.initDataUnsafe.user) {
+                this.userData = this.tg.initDataUnsafe.user;
+                console.log("TelegramBridge: Thông tin người dùng:", this.userData);
+            } else {
+                console.log("TelegramBridge: Không tìm thấy thông tin người dùng");
+            }
+            
+            // Lấy initData
+            this.initData = this.tg.initData;
+            
+            // Log ra để debug
+            console.log("TelegramBridge: Kết nối thành công với Telegram WebApp");
+            console.log("TelegramBridge: initData:", this.initData);
+            
+            // Ghi lại toàn bộ thông tin có sẵn từ Telegram.WebApp vào console để debug
+            console.log("TelegramBridge: Toàn bộ thông tin WebApp:", this.tg);
+            
+        } catch (e) {
+            console.log("TelegramBridge: Lỗi khi kết nối với Telegram", e);
+        }
+    },
+    
+    // Lấy thông tin người dùng Telegram
+    getUserInfo: function() {
+        if (!this.userData) {
+            console.log("TelegramBridge: Không có thông tin người dùng");
+            return null;
+        }
+        
+        return this.userData;
     }
 };
 
