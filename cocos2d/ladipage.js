@@ -575,6 +575,7 @@ var MyScene = cc.Scene.extend({
     
     // Called when scene is initialized
    // Called when scene is initialized
+// Called when scene is initialized
 onEnter: function() {
     this._super();
     var size = cc.director.getWinSize();
@@ -585,16 +586,29 @@ onEnter: function() {
     // Flag để ngăn xử lý chồng chéo
     this.isGameInProgress = false;
     
+    // Tính toán scale dựa vào kích thước thực tế
+    var calculateScale = function(imageWidth, imageHeight) {
+        var scaleX = size.width / imageWidth;
+        var scaleY = size.height / imageHeight;
+        
+        // Xác định scale phù hợp dựa vào thiết bị
+        if (cc.sys.isMobile) {
+            return Math.max(scaleX, scaleY);
+        } else {
+            return Math.min(scaleX, scaleY) + 0.1;
+        }
+    };
+    
     // Thiết lập background và table
     var background = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg");
     background.setPosition(size.width / 2, size.height / 2);
-    var bgScale = this.calculateScale(background.width, background.height);
+    var bgScale = calculateScale(background.width, background.height);
     background.setScale(bgScale);
     this.addChild(background, 0);
     
     var table = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/0f1f7e3e-05c6-47e8-9444-d517276d37d1.png");
     table.setPosition(size.width / 2, size.height / 2);
-    this.tableScale = this.calculateScale(table.width, table.height);
+    this.tableScale = calculateScale(table.width, table.height);
     table.setScale(this.tableScale);
     this.addChild(table, 1);
     
