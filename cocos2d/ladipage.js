@@ -4078,6 +4078,263 @@ window.TelegramBridge = {
     }
 };
 
+// Tạo GameBackEndBridge để giao tiếp với backend server
+window.GameBackEndBridge = {
+    // Cấu hình
+    serverUrl: 'https://cexgametest.tuanbmtx00019.workers.dev',
+    
+    // Lấy điểm Game từ server
+    async getGamePoints() {
+        try {
+            // Lấy thông tin người dùng từ Telegram
+            const userData = this.getUserData();
+            if (!userData || !userData.id) {
+                console.warn("Không tìm thấy thông tin người dùng để lấy điểm Game");
+                return { success: false, error: "Missing user data" };
+            }
+            
+            // Gọi API để lấy điểm Game
+            const response = await fetch(this.serverUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'getGamePoints',
+                    userId: userData.id
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Cập nhật vào cache local
+                this.cacheUserGamePoints(result.points);
+                
+                // Cập nhật vào game nếu đang chạy
+                this.updateGameWallet(result.points);
+                
+                console.log("Đã lấy gamePoints từ server:", result.points);
+                return { success: true, points: result.points || 0 };
+            } else {
+                console.error("Lỗi khi lấy điểm Game:", result.error || result.message);
+                return result;
+            }
+        } catch (error) {
+            console.error("Lỗi trong quá trình lấy điểm Game:", error);
+            return { success: false, error: error.message || "Unknown error" };
+        }
+    },
+    
+    // Cập nhật điểm Game lên server
+    async updateGamePoints(pointsChange) {
+        try {
+            // Lấy thông tin người dùng từ Telegram
+            const userData = this.getUserData();
+            if (!userData || !userData.id) {
+                console.warn("Không tìm thấy thông tin người dùng để cập nhật điểm Game");
+                return { success: false, error: "Missing user data" };
+            }
+            
+            // Gọi API để cập nhật điểm Game
+            const response = await fetch(this.serverUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'updateGamePoints',
+                    userId: userData.id,
+                    pointsChange: pointsChange
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Cập nhật vào cache local
+                this.cacheUserGamePoints(result.newPoints);
+                
+                // Cập nhật vào game nếu đang chạy
+                this.updateGameWallet(result.newPoints);
+                
+                console.log("Cập nhật điểm Game thành công, điểm mới:", result.newPoints);
+                return { success: true, newPoints: result.newPoints };
+            } else {
+                console.error("Lỗi khi cập nhật điểm Game:", result.error || result.message);
+                return result;
+            }
+        } catch (error) {
+            console.error("Lỗi trong quá trình cập nhật điểm Game:", error);
+            return { success: false, error: error.message || "Unknown error" };
+        }
+    },
+    
+    // Lấy thông tin người dùng từ Telegram hoặc localStorage
+    getUserData() {
+        // Ưu tiên lấy từ Telegram Bridge nếu có
+        if (window.TelegramBridge && typeof window.TelegramBridge.getUserInfo === 'function') {
+            const telegramUser = window.TelegramBridge.getUserInfo();
+            if (telegramUser && telegramUser.id) {
+                return telegramUser;
+            }
+        }
+        
+        // Nếu không có, thử lấy từ localStorage
+        try {
+            const storedUserData = localStorage.getItem('userData');
+            if (storedUserData) {
+                const userData = JSON.parse(storedUserData);
+                if (userData && userData.user && userData.user.id) {
+                    return userData.user;
+                }
+            }
+        } catch (e) {
+            console.error("Lỗi khi đọc userData từ localStorage:", e);
+        }
+        
+        return null;
+    },
+    
+    // Lưu điểm Game vào localStorage
+    cacheUserGamePoints(points) {
+        try {
+            // Lấy userData hiện tại
+            const storedUserData = localStorage.getItem('userData');
+            if (storedUserData) {
+                const userData = JSON.parse(storedUserData);
+                if (userData && userData.user) {
+                    // Cập nhật điểm Game
+                    userData.user.gamePoints = points;
+                    localStorage.setItem('userData', JSON.stringify(userData));
+                }
+            }
+        } catch (e) {
+            console.error("Lỗi khi lưu gamePoints vào localStorage:", e);
+        }
+    },
+    
+    // Cập nhật ví trong game hiện tại
+    updateGameWallet(points) {
+        if (window.cc && cc.director) {
+            const currentScene = cc.director.getRunningScene();
+            if (currentScene && currentScene.gameState) {
+                // Cập nhật ví người chơi trong game
+                currentScene.gameState.playerWallet = points;
+                
+                // Cập nhật hiển thị ví nếu có
+                if (typeof currentScene.displayWalletInfo === 'function') {
+                    currentScene.displayWalletInfo();
+                }
+            }
+        }
+    },
+    
+    // Đồng bộ điểm sau khi kết thúc ván đấu
+    syncGameResult(winner, pot) {
+        // Tính toán số điểm thay đổi dựa trên kết quả
+        let pointsChange = 0;
+        
+        if (winner === "player") {
+            // Người chơi thắng, tính điểm cộng
+            const amountAfterFee = pot * 0.96;
+            pointsChange = Math.floor(amountAfterFee);
+        } else if (winner === "ai") {
+            // AI thắng, người chơi thua, tính điểm trừ
+            // Lấy MyScene hiện tại để tính điểm thua
+            const currentScene = cc.director.getRunningScene();
+            if (currentScene && currentScene.gameState) {
+                const lostAmount = currentScene.gameState.playerDefaultStack - currentScene.gameState.playerStack;
+                pointsChange = -Math.floor(lostAmount);
+            }
+        }
+        
+        // Chỉ cập nhật nếu có thay đổi điểm
+        if (pointsChange !== 0) {
+            this.updateGamePoints(pointsChange)
+                .then(result => {
+                    console.log("Đã đồng bộ điểm Game sau ván đấu:", result.newPoints);
+                })
+                .catch(err => {
+                    console.error("Lỗi khi đồng bộ điểm Game sau ván đấu:", err);
+                });
+        }
+    },
+    
+    // Phương thức khởi tạo cho bridge
+    initialize() {
+        console.log("GameBackEndBridge: Đang khởi tạo...");
+        
+        // Lấy điểm Game ban đầu từ server
+        this.getGamePoints()
+            .then(result => {
+                console.log("Khởi tạo điểm Game thành công:", result);
+            })
+            .catch(err => {
+                console.error("Lỗi khi khởi tạo điểm Game:", err);
+            });
+        
+        // Tích hợp với MyScene để tự động đồng bộ kết quả
+        if (window.MyScene && MyScene.prototype) {
+            this.integrateWithGameScene();
+        }
+        
+        console.log("GameBackEndBridge: Khởi tạo hoàn tất");
+    },
+    
+    // Tích hợp với MyScene
+    integrateWithGameScene() {
+        if (!window.MyScene || !MyScene.prototype) return;
+        
+        const self = this;
+        
+        // Lưu lại phương thức handleWinnerAnimation gốc
+        const originalHandleWinner = MyScene.prototype.handleWinnerAnimation;
+        
+        // Ghi đè để đồng bộ điểm với server sau khi kết thúc ván đấu
+        MyScene.prototype.handleWinnerAnimation = function(winner, resultMessage, potContainer) {
+            // Gọi phương thức gốc trước
+            originalHandleWinner.call(this, winner, resultMessage, potContainer);
+            
+            // Đồng bộ điểm với server
+            self.syncGameResult(winner, this.gameState.pot);
+        };
+        
+        // Sửa đổi balancePlayerStack để đồng bộ với server
+        const originalBalancePlayer = MyScene.prototype.balancePlayerStack;
+        
+        MyScene.prototype.balancePlayerStack = function() {
+            // Gọi phương thức gốc trước
+            originalBalancePlayer.call(this);
+            
+            // Kiểm tra và đồng bộ ví định kỳ
+            self.getGamePoints()
+                .then(result => {
+                    console.log("Đã kiểm tra và đồng bộ ví game");
+                })
+                .catch(err => {
+                    console.error("Lỗi khi đồng bộ ví game:", err);
+                });
+        };
+        
+        console.log("Đã tích hợp GameBackEndBridge với MyScene");
+    }
+};
+
+// Khởi tạo GameBackEndBridge sau khi trang đã load hoàn tất
+document.addEventListener('DOMContentLoaded', function() {
+    // Khởi tạo GameBackEndBridge sau khi Telegram đã khởi tạo (nếu có)
+    if (window.TelegramBridge) {
+        // Đợi Telegram Bridge khởi tạo xong
+        setTimeout(function() {
+            window.GameBackEndBridge.initialize();
+        }, 1000);
+    } else {
+        // Khởi tạo ngay nếu không có Telegram
+        window.GameBackEndBridge.initialize();
+    }
+});
+
 // Thông báo cho index.html biết rằng GameBridge đã sẵn sàng
 document.dispatchEvent(new Event('gameBridgeReady'));
 
