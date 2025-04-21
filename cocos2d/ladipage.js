@@ -2653,12 +2653,11 @@ this.walletLabel.enableShadow(cc.color(0, 0, 0, 255), cc.size(3, -3), 2);
 this.addChild(this.walletLabel, 10);
 },
 
-// Nạp lại chip cho người chơi
-// Sửa lại hàm refillPlayerStack để kiểm tra số dư ví và trả về trạng thái thành công/thất bại
+// Sửa lại phương thức refillPlayerStack trong MyScene
 refillPlayerStack: function() {
     // Kiểm tra xem người chơi có đủ chip mặc định không
     if (this.gameState.playerStack < this.gameState.playerDefaultStack) {
-        console.log("Player stack is below default amount, attempting to refill from wallet");
+        console.log("Player stack is below default amount, refilling from wallet");
 
         var amountNeeded = this.gameState.playerDefaultStack - this.gameState.playerStack;
         console.log("Amount needed to refill:", amountNeeded);
@@ -2666,19 +2665,45 @@ refillPlayerStack: function() {
         // Kiểm tra xem wallet có đủ chip để nạp không
         if (this.gameState.playerWallet >= amountNeeded) {
             // Trừ chip từ ví để nạp vào stack
+            const oldWalletAmount = this.gameState.playerWallet;
             this.gameState.playerWallet -= amountNeeded;
             this.gameState.playerStack = this.gameState.playerDefaultStack;
             
             console.log("Refilled player stack to:", this.gameState.playerDefaultStack);
-            console.log("Player wallet remaining:", this.gameState.playerWallet);
+            console.log("Player wallet reduced from", oldWalletAmount, "to", this.gameState.playerWallet);
+            
+            // Đồng bộ số dư ví mới về server ngay lập tức
+            if (window.GameBackEndBridge) {
+                window.GameBackEndBridge.updateWalletDirectly(this.gameState.playerWallet)
+                    .then(result => {
+                        console.log("Đã cập nhật số dư ví về server:", result);
+                    })
+                    .catch(err => {
+                        console.error("Lỗi khi cập nhật số dư ví:", err);
+                    });
+            }
+            
             return true; // Refill thành công
         } else if (this.gameState.playerWallet > 0) {
             // Nếu ví còn chip nhưng không đủ, nạp số còn lại
+            const oldWalletAmount = this.gameState.playerWallet;
             this.gameState.playerStack += this.gameState.playerWallet;
             this.gameState.playerWallet = 0;
             
             console.log("Partially refilled player stack to:", this.gameState.playerStack);
-            console.log("Player wallet is now empty");
+            console.log("Player wallet is now empty, reduced from", oldWalletAmount);
+            
+            // Đồng bộ số dư ví mới về server ngay lập tức
+            if (window.GameBackEndBridge) {
+                window.GameBackEndBridge.updateWalletDirectly(0)
+                    .then(result => {
+                        console.log("Đã cập nhật số dư ví về server:", result);
+                    })
+                    .catch(err => {
+                        console.error("Lỗi khi cập nhật số dư ví:", err);
+                    });
+            }
+            
             return false; // Refill không đủ
         } else {
             console.log("Cannot refill player stack: wallet is empty");
@@ -4418,6 +4443,49 @@ window.GameBackEndBridge = {
             }
         }
     },
+
+    // Thêm vào GameBackEndBridge
+async updateWalletDirectly(newAmount) {
+    try {
+        // Lấy thông tin người dùng từ Telegram
+        const userData = this.getUserData();
+        if (!userData || !userData.id) {
+            console.warn("Không tìm thấy thông tin người dùng để cập nhật ví");
+            return { success: false, error: "Missing user data" };
+        }
+        
+        console.log("Cập nhật trực tiếp số dư ví về server:", newAmount);
+        
+        // Gọi API để đặt số dư ví trực tiếp
+        const response = await fetch(this.serverUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'setWalletAmount',
+                userId: userData.id,
+                walletAmount: newAmount
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Cập nhật vào cache local
+            this.cacheUserGamePoints(newAmount);
+            
+            console.log("Cập nhật số dư ví thành công:", newAmount);
+            return { success: true, walletAmount: newAmount };
+        } else {
+            console.error("Lỗi khi cập nhật số dư ví:", result.error || result.message);
+            return result;
+        }
+    } catch (error) {
+        console.error("Lỗi trong quá trình cập nhật số dư ví:", error);
+        return { success: false, error: error.message || "Unknown error" };
+    }
+},
     
     // Đồng bộ điểm sau khi kết thúc ván đấu
    // Đồng bộ điểm sau khi kết thúc ván đấu
