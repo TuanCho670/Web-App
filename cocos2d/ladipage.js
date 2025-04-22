@@ -3040,34 +3040,15 @@ showdown: function() {
                 // Cập nhật trực tiếp vào ví người chơi
                 self.gameState.playerWallet += amountAfterFee;
                 
-                // Đồng bộ ví về server - CHỈ SỬ DỤNG updateWalletDirectly
-                if (window.GameBackEndBridge) {
-                    console.log("Fallback: Cập nhật số dư ví về server:", self.gameState.playerWallet);
-                    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet)
-                        .then(result => {
-                            console.log("✅ Đã cập nhật số dư ví về server thành công (fallback):", result);
-                        })
-                        .catch(err => {
-                            console.error("❌ Lỗi khi cập nhật số dư ví về server (fallback):", err);
-                        });
-                }
+               
+               
             } else if (self.gameState.winner === "ai") {
                 // QUAN TRỌNG: Cộng tiền vào stack của AI
                 self.gameState.aiStack += amountAfterFee;
                 console.log("FALLBACK AI win - AI stack increased to:", self.gameState.aiStack);
                 
-                // Đồng bộ kết quả về server - CHỈ SỬ DỤNG updateWalletDirectly
-                // Đảm bảo số dư ví được cập nhật sau khi AI thắng
-                if (window.GameBackEndBridge) {
-                    console.log("Fallback: Cập nhật số dư ví về server (không thay đổi):", self.gameState.playerWallet);
-                    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet)
-                        .then(result => {
-                            console.log("✅ Đã cập nhật số dư ví về server thành công (fallback):", result);
-                        })
-                        .catch(err => {
-                            console.error("❌ Lỗi khi cập nhật số dư ví về server (fallback):", err);
-                        });
-                }
+              
+               
             } else {
                 // Chia đều tiền khi hòa
                 var halfPot = Math.floor(totalPot / 2);
@@ -3081,17 +3062,7 @@ showdown: function() {
                 self.gameState.aiStack += aiAmount;
                 console.log("FALLBACK tie - AI stack increased to:", self.gameState.aiStack);
                 
-                // Đồng bộ số dư ví mới về server - CHỈ SỬ DỤNG updateWalletDirectly
-                if (window.GameBackEndBridge) {
-                    console.log("Fallback: Cập nhật số dư ví về server sau khi hòa:", self.gameState.playerWallet);
-                    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet)
-                        .then(result => {
-                            console.log("✅ Đã cập nhật số dư ví về server thành công (fallback):", result);
-                        })
-                        .catch(err => {
-                            console.error("❌ Lỗi khi cập nhật số dư ví về server (fallback):", err);
-                        });
-                }
+               
             }
             
             self.gameState.pot = 0;
@@ -4718,19 +4689,6 @@ integrateWithGameScene() {
                 self.updateStackDisplay();
                 self.updatePotDisplay();
                 
-                // QUAN TRỌNG: Vẫn cập nhật ví lên server ngay cả khi AI thắng
-                // Đảm bảo số dư được đồng bộ chính xác
-                if (window.GameBackEndBridge) {
-                    console.log("Đồng bộ số dư ví sau khi AI thắng (không thay đổi):", self.gameState.playerWallet);
-                    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet)
-                        .then(result => {
-                            console.log("✅ Đã cập nhật số dư ví về server thành công:", result);
-                        })
-                        .catch(err => {
-                            console.error("❌ Lỗi khi cập nhật số dư ví về server:", err);
-                        });
-                }
-                
                 self.scheduleOnce(function() {
                     self.startNewHand();
                 }, 1.5);
@@ -4821,18 +4779,18 @@ MyScene.prototype.balancePlayerStack = function() {
     }
 };
     
-    // Thêm một phương thức tiện ích mới để kiểm tra và đồng bộ số dư ví
-MyScene.prototype.syncWalletWithServer = function() {
-    if (window.GameBackEndBridge) {
-        window.GameBackEndBridge.updateWalletDirectly(this.gameState.playerWallet)
-            .then(result => {
-                console.log("Đã đồng bộ thành công số dư ví với server:", result);
-            })
-            .catch(err => {
-                console.error("Lỗi khi đồng bộ số dư ví với server:", err);
-            });
-    }
-};
+//     // Thêm một phương thức tiện ích mới để kiểm tra và đồng bộ số dư ví
+// MyScene.prototype.syncWalletWithServer = function() {
+//     if (window.GameBackEndBridge) {
+//         window.GameBackEndBridge.updateWalletDirectly(this.gameState.playerWallet)
+//             .then(result => {
+//                 console.log("Đã đồng bộ thành công số dư ví với server:", result);
+//             })
+//             .catch(err => {
+//                 console.error("Lỗi khi đồng bộ số dư ví với server:", err);
+//             });
+//     }
+// };
     
     console.log("Đã tích hợp GameBackEndBridge với MyScene");
 }
