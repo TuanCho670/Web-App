@@ -981,7 +981,7 @@ createRechargeButton: function(x, y) {
         
         // Thêm text
         var text = type === 'fold' ? "FOLD" : "ALL IN";
-        var fontSize = (cc.sys.isMobile ? 35 : 50) * this.tableScale;
+        var fontSize = (cc.sys.isMobile ? 50 : 50) * this.tableScale;
         var label = new cc.LabelTTF(text, "Arial", fontSize);
         label.setPosition(button.width/2, button.height/2);
         label.setColor(cc.color(255, 255, 255));
