@@ -1931,6 +1931,11 @@ for (var i = 0; i < numChips; i++) {
                                 console.log("Error removing container:", e);
                             }
                         }
+
+                        if (window.GameBackEndBridge) {
+                            console.log("Fallback: Gọi syncGameResult để đồng bộ kết quả về sheet");
+                            window.GameBackEndBridge.syncGameResult(winner, totalPot);
+                        }
                         
                         // Gọi callback khi hoàn thành
                         if (typeof callback === 'function') {
@@ -4609,8 +4614,7 @@ integrateWithGameScene() {
     // Lưu lại phương thức handleWinnerAnimation gốc
     const originalHandleWinner = MyScene.prototype.handleWinnerAnimation;
     
-   // Sửa lại phương thức handleWinnerAnimation để cập nhật số tiền thắng vào ví người chơi
-// Sửa lại hàm handleWinnerAnimation để đảm bảo AI luôn có 32 chip sau khi xử lý thắng/thua
+
 MyScene.prototype.handleWinnerAnimation = function(winner, resultMessage, potContainer) {
     var self = this;
     var size = cc.director.getWinSize();
@@ -4652,6 +4656,10 @@ MyScene.prototype.handleWinnerAnimation = function(winner, resultMessage, potCon
                     .catch(err => {
                         console.error("Lỗi khi cập nhật số dư ví về server:", err);
                     });
+                
+                // THÊM: Đảm bảo gọi syncGameResult để cập nhật kết quả về sheet
+                console.log("Gọi syncGameResult để đồng bộ kết quả về sheet");
+                window.GameBackEndBridge.syncGameResult(winner, totalPot);
             }
             
             // Luôn đưa AI stack về đúng 32 
@@ -4687,6 +4695,12 @@ MyScene.prototype.handleWinnerAnimation = function(winner, resultMessage, potCon
             
             self.updateStackDisplay();
             self.updatePotDisplay();
+            
+            // THÊM: Đảm bảo gọi syncGameResult để cập nhật kết quả về sheet
+            if (window.GameBackEndBridge) {
+                console.log("Gọi syncGameResult để đồng bộ kết quả về sheet");
+                window.GameBackEndBridge.syncGameResult(winner, totalPot);
+            }
             
             self.scheduleOnce(function() {
                 self.startNewHand();
@@ -4740,6 +4754,10 @@ MyScene.prototype.handleWinnerAnimation = function(winner, resultMessage, potCon
                         .catch(err => {
                             console.error("Lỗi khi cập nhật số dư ví về server:", err);
                         });
+                    
+                    // THÊM: Đảm bảo gọi syncGameResult để cập nhật kết quả về sheet
+                    console.log("Gọi syncGameResult để đồng bộ kết quả về sheet");
+                    window.GameBackEndBridge.syncGameResult(winner, totalPot);
                 }
                 
                 self.scheduleOnce(function() {
