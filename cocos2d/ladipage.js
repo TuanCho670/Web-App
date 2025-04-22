@@ -558,8 +558,8 @@ var MyScene = cc.Scene.extend({
         state: "waiting", // waiting, dealing, playerTurn, showdown
         pot: 0,
         minBet: 4,
-        playerStack: 32,
-        aiStack: 32,
+        playerStack: 0,  // Thay đổi thành 0 thay vì 32 cho người chơi
+        aiStack: 32,     // AI giữ nguyên stack mặc định
         playerWallet: 1000, // Ví của người chơi với 1000 chip ban đầu
         playerDefaultStack: 32, // Stack mặc định của người chơi
         aiDefaultStack: 32, // Stack mặc định của AI
@@ -575,192 +575,202 @@ var MyScene = cc.Scene.extend({
     
     onEnter: function() {
         this._super();
-        var size = cc.director.getWinSize();
-        var self = this;
-        
-        console.log("Scene entered - initializing game");
-        
-        // Flag để ngăn xử lý chồng chéo
-        this.isGameInProgress = false;
-        
-        // Tính toán scale dựa vào kích thước thực tế
-        var calculateScale = function(imageWidth, imageHeight) {
-            var scaleX = size.width / imageWidth;
-            var scaleY = size.height / imageHeight;
-            
-            // Xác định scale phù hợp dựa vào thiết bị
-            if (cc.sys.isMobile) {
-                return Math.max(scaleX, scaleY);
-            } else {
-                return Math.min(scaleX, scaleY) + 0.1;
-            }
-        };
-        
-        // Thiết lập background và table
-        var background = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg");
-        background.setPosition(size.width / 2, size.height / 2);
-        var bgScale = calculateScale(background.width, background.height);
-        background.setScale(bgScale);
-        this.addChild(background, 0);
-        
-        var table = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/0f1f7e3e-05c6-47e8-9444-d517276d37d1.png");
-        table.setPosition(size.width / 2, size.height / 2);
-        this.tableScale = calculateScale(table.width, table.height);
-        table.setScale(this.tableScale);
-        this.addChild(table, 1);
-        
-        // Lưu tham chiếu đến table
-        this.table = table;
-        
-        // Khởi tạo vị trí pot
-        this.potPosition = cc.p(size.width / 2, size.height / 2 + 115);
-        
-        // Tạo thông tin người chơi
-        this.createPlayers();
-        
-        var centerX = size.width / 2;
-        var buttonSpacing = 120; // khoảng cách ngang
-        var yPos = 60; // khoảng cách từ đáy màn hình
+    var size = cc.director.getWinSize();
+    var self = this;
     
-        this.foldButton = this.createActionButton(centerX - buttonSpacing, yPos, 'fold');
-        this.addChild(this.foldButton, 10);
+    console.log("Scene entered - initializing game");
     
-        this.allinButton = this.createActionButton(centerX + buttonSpacing, yPos, 'allin');
-        this.addChild(this.allinButton, 10);
+    // Flag để ngăn xử lý chồng chéo
+    this.isGameInProgress = false;
+    
+    // Tính toán scale dựa vào kích thước thực tế
+    var calculateScale = function(imageWidth, imageHeight) {
+        var scaleX = size.width / imageWidth;
+        var scaleY = size.height / imageHeight;
         
-        // Khởi tạo pot trống
-        this.initPot();
-        
-        // Preload âm thanh
-        this.soundManager.preloadAll();
-        
-        // Tạo và hiển thị loading indicator
-        var loadingLabel = new cc.LabelTTF("Đang tải dữ liệu ví...", "Arial Bold", 32 * this.tableScale);
-        loadingLabel.setPosition(size.width / 2, size.height / 2);
-        loadingLabel.setColor(cc.color(255, 255, 255));
-        
-        // Thêm shadow để dễ đọc
-        loadingLabel.enableShadow(cc.color(0, 0, 0, 255), cc.size(2, 2), 3);
-        
-        this.addChild(loadingLabel, 100);
-        
-        // Thêm hiệu ứng đợi để tăng trải nghiệm người dùng
-        var dots = ".";
-        loadingLabel.schedule(function() {
-            dots = dots.length >= 3 ? "." : dots + ".";
-            loadingLabel.setString("Đang tải dữ liệu ví" + dots);
-        }, 0.5);
-        
-        // Kiểm tra nếu có GameBackEndBridge
-        if (window.GameBackEndBridge) {
-            // Tải điểm từ server
-            window.GameBackEndBridge.getGamePoints()
-                .then(function(result) {
-                    console.log("Kết quả lấy điểm từ server:", result);
+        // Xác định scale phù hợp dựa vào thiết bị
+        if (cc.sys.isMobile) {
+            return Math.max(scaleX, scaleY);
+        } else {
+            return Math.min(scaleX, scaleY) + 0.1;
+        }
+    };
+    
+    // Thiết lập background và table
+    var background = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/fee0be5a-9db2-4716-a806-ff84222f03ca.jpg");
+    background.setPosition(size.width / 2, size.height / 2);
+    var bgScale = calculateScale(background.width, background.height);
+    background.setScale(bgScale);
+    this.addChild(background, 0);
+    
+    var table = new cc.Sprite("https://tuancho670.github.io/Web-App/assets/0f1f7e3e-05c6-47e8-9444-d517276d37d1.png");
+    table.setPosition(size.width / 2, size.height / 2);
+    this.tableScale = calculateScale(table.width, table.height);
+    table.setScale(this.tableScale);
+    this.addChild(table, 1);
+    
+    // Lưu tham chiếu đến table
+    this.table = table;
+    
+    // Khởi tạo vị trí pot
+    this.potPosition = cc.p(size.width / 2, size.height / 2 + 115);
+    
+    // Tạo thông tin người chơi
+    this.createPlayers();
+    
+    var centerX = size.width / 2;
+    var buttonSpacing = 120; // khoảng cách ngang
+    var yPos = 60; // khoảng cách từ đáy màn hình
+
+    this.foldButton = this.createActionButton(centerX - buttonSpacing, yPos, 'fold');
+    this.addChild(this.foldButton, 10);
+
+    this.allinButton = this.createActionButton(centerX + buttonSpacing, yPos, 'allin');
+    this.addChild(this.allinButton, 10);
+    
+    // Khởi tạo pot trống
+    this.initPot();
+    
+    // Preload âm thanh
+    this.soundManager.preloadAll();
+    
+    // Tạo và hiển thị loading indicator
+    var loadingLabel = new cc.LabelTTF("Đang tải dữ liệu ví...", "Arial Bold", 32 * this.tableScale);
+    loadingLabel.setPosition(size.width / 2, size.height / 2);
+    loadingLabel.setColor(cc.color(255, 255, 255));
+    
+    // Thêm shadow để dễ đọc
+    loadingLabel.enableShadow(cc.color(0, 0, 0, 255), cc.size(2, 2), 3);
+    
+    this.addChild(loadingLabel, 100);
+    
+    // Thêm hiệu ứng đợi để tăng trải nghiệm người dùng
+    var dots = ".";
+    loadingLabel.schedule(function() {
+        dots = dots.length >= 3 ? "." : dots + ".";
+        loadingLabel.setString("Đang tải dữ liệu ví" + dots);
+    }, 0.5);
+    
+    // Kiểm tra nếu có GameBackEndBridge
+    if (window.GameBackEndBridge) {
+        // Tải điểm từ server
+        window.GameBackEndBridge.getGamePoints()
+            .then(function(result) {
+                console.log("Kết quả lấy điểm từ server:", result);
+                
+                if (result.success) {
+                    // Cập nhật ví người chơi từ server
+                    self.gameState.playerWallet = result.points;
+                    console.log("Đã cập nhật ví người chơi:", self.gameState.playerWallet);
                     
-                    if (result.success) {
-                        // Cập nhật ví người chơi từ server
-                        self.gameState.playerWallet = result.points;
-                        console.log("Đã cập nhật ví người chơi:", self.gameState.playerWallet);
-                        
-                        // Đặt stack về 0 ban đầu để đảm bảo trừ chính xác từ ví
-                        self.gameState.playerStack = 0;
-                        
-                        // Hiển thị thông tin ví
-                        self.displayWalletInfo();
-                        
-                        // Kiểm tra số dư ví để quyết định luồng tiếp theo
-                        if (self.gameState.playerWallet >= self.gameState.playerDefaultStack) {
-                            // Có đủ tiền trong ví, tiến hành trừ tiền và bắt đầu game
-                            loadingLabel.unscheduleAllCallbacks();
-                            loadingLabel.removeFromParent(true);
-                            
-                            // Bắt đầu ván mới sau khi kiểm tra đủ điều kiện
-                            self.scheduleOnce(function() {
-                                console.log("Starting new hand after wallet check");
-                                self.startNewHand();
-                                self.isGameInProgress = false;
-                            }, 0.5);
-                        } else if (self.gameState.playerWallet > 0) {
-                            // Không đủ tiền, nhưng có tiền - hiển thị thông báo
-                            loadingLabel.unscheduleAllCallbacks();
-                            loadingLabel.setString("Số dư không đủ! Cần " + 
-                                                 self.gameState.playerDefaultStack + 
-                                                 " chip để chơi. Bạn có " + 
-                                                 self.gameState.playerWallet + " chip.");
-                            
-                            // Tự động ẩn sau 3 giây
-                            self.scheduleOnce(function() {
-                                loadingLabel.removeFromParent(true);
-                                
-                                // Bắt đầu ván mới với số tiền hiện có
-                                self.startNewHand();
-                                self.isGameInProgress = false;
-                            }, 3.0);
-                        } else {
-                            // Ví rỗng, hiển thị thông báo nạp tiền
-                            loadingLabel.unscheduleAllCallbacks();
-                            loadingLabel.setString("Ví của bạn rỗng! Vui lòng nạp thêm CEXCOIN để chơi.");
-                            
-                            // Tạo nút nạp tiền
-                            var rechargeButton = self.createRechargeButton(size.width / 2, size.height / 2 - 80);
-                            self.addChild(rechargeButton, 101);
-                            
-                            // Không tự động ẩn thông báo
-                        }
-                    } else {
-                        // Lỗi từ server, sử dụng giá trị mặc định
-                        console.warn("Không thể lấy điểm từ server, sử dụng giá trị mặc định");
+                    // Đặt stack người chơi về 0 ban đầu để đảm bảo trừ chính xác từ ví
+                    // AI vẫn giữ stack mặc định
+                    self.gameState.playerStack = 0;
+                    
+                    // Hiển thị thông tin ví
+                    self.displayWalletInfo();
+                    
+                    // Kiểm tra số dư ví để quyết định luồng tiếp theo
+                    if (self.gameState.playerWallet >= self.gameState.playerDefaultStack) {
+                        // Có đủ tiền trong ví, tiến hành trừ tiền và bắt đầu game
                         loadingLabel.unscheduleAllCallbacks();
                         loadingLabel.removeFromParent(true);
                         
-                        // Hiển thị thông tin ví
-                        self.displayWalletInfo();
-                        
-                        // Bắt đầu ván mới
+                        // Bắt đầu ván mới sau khi kiểm tra đủ điều kiện
                         self.scheduleOnce(function() {
-                            console.log("Starting new hand with default wallet value");
+                            console.log("Starting new hand after wallet check");
                             self.startNewHand();
                             self.isGameInProgress = false;
                         }, 0.5);
+                    } else if (self.gameState.playerWallet > 0) {
+                        // Không đủ tiền, nhưng có tiền - hiển thị thông báo
+                        loadingLabel.unscheduleAllCallbacks();
+                        loadingLabel.setString("Số dư không đủ! Cần " + 
+                                             self.gameState.playerDefaultStack + 
+                                             " chip để chơi. Bạn có " + 
+                                             self.gameState.playerWallet + " chip.");
+                        
+                        // Tự động ẩn sau 3 giây
+                        self.scheduleOnce(function() {
+                            loadingLabel.removeFromParent(true);
+                            
+                            // Bắt đầu ván mới với số tiền hiện có
+                            self.startNewHand();
+                            self.isGameInProgress = false;
+                        }, 3.0);
+                    } else {
+                        // Ví rỗng, hiển thị thông báo nạp tiền
+                        loadingLabel.unscheduleAllCallbacks();
+                        loadingLabel.setString("Ví của bạn rỗng! Vui lòng nạp thêm CEXCOIN để chơi.");
+                        
+                        // Tạo nút nạp tiền
+                        var rechargeButton = self.createRechargeButton(size.width / 2, size.height / 2 - 80);
+                        self.addChild(rechargeButton, 101);
+                        
+                        // Không tự động ẩn thông báo
                     }
-                })
-                .catch(function(error) {
-                    console.error("Lỗi khi lấy điểm từ server:", error);
-                    
-                    // Hiển thị thông báo lỗi
+                } else {
+                    // Lỗi từ server, sử dụng giá trị mặc định
+                    console.warn("Không thể lấy điểm từ server, sử dụng giá trị mặc định");
                     loadingLabel.unscheduleAllCallbacks();
-                    loadingLabel.setString("Không thể kết nối đến server. Đang sử dụng dữ liệu offline.");
+                    loadingLabel.removeFromParent(true);
                     
-                    // Tự động xóa thông báo sau 2 giây
+                    // Reset stack người chơi về 0, AI giữ nguyên mặc định
+                    self.gameState.playerStack = 0;
+                    
+                    // Hiển thị thông tin ví
+                    self.displayWalletInfo();
+                    
+                    // Bắt đầu ván mới
                     self.scheduleOnce(function() {
-                        loadingLabel.removeFromParent(true);
-                        
-                        // Hiển thị thông tin ví với giá trị mặc định
-                        self.displayWalletInfo();
-                        
-                        // Bắt đầu ván mới
                         console.log("Starting new hand with default wallet value");
                         self.startNewHand();
                         self.isGameInProgress = false;
-                    }, 2.0);
-                });
-        } else {
-            console.warn("GameBackEndBridge không tồn tại, sử dụng giá trị mặc định");
-            
-            // Xóa loading label ngay lập tức
-            loadingLabel.removeFromParent(true);
-            
-            // Hiển thị thông tin ví
-            self.displayWalletInfo();
-            
-            // Bắt đầu ván mới
-            self.scheduleOnce(function() {
-                console.log("Starting new hand with default wallet value");
-                self.startNewHand();
-                self.isGameInProgress = false;
-            }, 0.5);
-        }
+                    }, 0.5);
+                }
+            })
+            .catch(function(error) {
+                console.error("Lỗi khi lấy điểm từ server:", error);
+                
+                // Hiển thị thông báo lỗi
+                loadingLabel.unscheduleAllCallbacks();
+                loadingLabel.setString("Không thể kết nối đến server. Đang sử dụng dữ liệu offline.");
+                
+                // Reset stack người chơi về 0, AI giữ nguyên mặc định
+                self.gameState.playerStack = 0;
+                
+                // Tự động xóa thông báo sau 2 giây
+                self.scheduleOnce(function() {
+                    loadingLabel.removeFromParent(true);
+                    
+                    // Hiển thị thông tin ví với giá trị mặc định
+                    self.displayWalletInfo();
+                    
+                    // Bắt đầu ván mới
+                    console.log("Starting new hand with default wallet value");
+                    self.startNewHand();
+                    self.isGameInProgress = false;
+                }, 2.0);
+            });
+    } else {
+        console.warn("GameBackEndBridge không tồn tại, sử dụng giá trị mặc định");
+        
+        // Reset stack người chơi về 0, AI giữ nguyên mặc định
+        self.gameState.playerStack = 0;
+        
+        // Xóa loading label ngay lập tức
+        loadingLabel.removeFromParent(true);
+        
+        // Hiển thị thông tin ví
+        self.displayWalletInfo();
+        
+        // Bắt đầu ván mới
+        self.scheduleOnce(function() {
+            console.log("Starting new hand with default wallet value");
+            self.startNewHand();
+            self.isGameInProgress = false;
+        }, 0.5);
+    }
     },
 
     // Thêm phương thức tạo nút nạp tiền
@@ -1086,11 +1096,12 @@ console.log("Cannot show buttons - not initialized");
     
         this.buttonsHiddenManually = false;
         
-        // Đảm bảo trừ tiền từ ví cho lần chơi đầu tiên
-        var refillSuccess = this.refillPlayerStack();
+        // Đảm bảo trừ tiền từ ví cho người chơi, AI tự nạp
+        var refillPlayerSuccess = this.refillPlayerStack();
+        this.refillAIStack(); // AI luôn có đủ stack
         
         // Chỉ tiếp tục nếu refill thành công hoặc đã có đủ chip
-        if (!refillSuccess && this.gameState.playerStack < this.gameState.playerDefaultStack) {
+        if (!refillPlayerSuccess && this.gameState.playerStack < this.gameState.playerDefaultStack) {
             console.log("Not enough chips to start a new hand");
             
             // Hiển thị thông báo không đủ chip
@@ -1111,10 +1122,6 @@ console.log("Cannot show buttons - not initialized");
             return;
         }
         
-        // Cân bằng stack cho AI
-        this.refillAIStack();
-        this.balanceAIStack();
-        
         // Cập nhật hiển thị
         this.displayWalletInfo();
         this.updateStackDisplay();
@@ -1127,7 +1134,7 @@ console.log("Cannot show buttons - not initialized");
         
         this.buttonActionInProgress = false;
         this.setButtonsActive(false); // Bắt đầu với nút không active
-
+    
         // Đợi hoàn thành animation xóa bàn
         this.scheduleOnce(function() {
             console.log("Table cleared, starting blind animation");
@@ -2717,20 +2724,19 @@ refillPlayerStack: function() {
 
 // AI luôn tự động nạp lại đủ stack
 refillAIStack: function() {
-// Kiểm tra xem AI có đủ chip mặc định không
-if (this.gameState.aiStack < this.gameState.aiDefaultStack) {
-console.log("AI stack is below default amount, automatically refilling");
+   // Kiểm tra xem AI có đủ chip mặc định không
+   if (this.gameState.aiStack < this.gameState.aiDefaultStack) {
+    console.log("AI stack is below default amount, automatically refilling");
 
-var amountNeeded = this.gameState.aiDefaultStack - this.gameState.aiStack;
-console.log("Amount needed to refill AI stack:", amountNeeded);
+    // AI luôn được nạp đủ chip mặc định mà không lấy từ ví người chơi
+    this.gameState.aiStack = this.gameState.aiDefaultStack;
 
-// AI luôn được nạp đủ chip mặc định
-this.gameState.aiStack = this.gameState.aiDefaultStack;
-
-console.log("Refilled AI stack to default:", this.gameState.aiDefaultStack);
+    console.log("Refilled AI stack to default:", this.gameState.aiDefaultStack);
 } else {
-console.log("AI stack is already at or above default amount, no refill needed");
+    console.log("AI stack is already at or above default amount, no refill needed");
 }
+
+return true; // AI luôn có đủ chip để chơi
 },
 
 // Cân bằng stack của người chơi
@@ -2899,152 +2905,164 @@ this.startNewHand();
 
 // Showdown - xác định người thắng
 showdown: function() {
-var self = this;
+    var self = this;
 
-// Đánh giá bài của cả hai bên
-var playerHandValue = this.evaluateHandDetailed(this.gameState.playerCards, this.gameState.communityCards);
-var aiHandValue = this.evaluateHandDetailed(this.gameState.aiCards, this.gameState.communityCards);
+    // Đánh giá bài của cả hai bên
+    var playerHandValue = this.evaluateHandDetailed(this.gameState.playerCards, this.gameState.communityCards);
+    var aiHandValue = this.evaluateHandDetailed(this.gameState.aiCards, this.gameState.communityCards);
 
-// Log chi tiết để debug
-console.log("------- SHOWDOWN DETAILS -------");
-console.log("Community cards:", this.gameState.communityCards);
-console.log("Player cards:", this.gameState.playerCards);
-console.log("Player hand evaluation:", playerHandValue);
-console.log("AI cards:", this.gameState.aiCards);
-console.log("AI hand evaluation:", aiHandValue);
+    // Log chi tiết để debug
+    console.log("------- SHOWDOWN DETAILS -------");
+    console.log("Community cards:", this.gameState.communityCards);
+    console.log("Player cards:", this.gameState.playerCards);
+    console.log("Player hand evaluation:", playerHandValue);
+    console.log("AI cards:", this.gameState.aiCards);
+    console.log("AI hand evaluation:", aiHandValue);
 
-// So sánh rank trước
-var result = "";
-var potContainer = new cc.Node();
-potContainer.setPosition(this.potPosition);
-this.addChild(potContainer, 10);
+    // So sánh rank trước
+    var result = "";
+    var potContainer = new cc.Node();
+    potContainer.setPosition(this.potPosition);
+    this.addChild(potContainer, 10);
 
-// Quyết định người thắng và hiển thị bài thắng
-if (playerHandValue.rank > aiHandValue.rank) {
-// Người chơi thắng vì có bộ bài mạnh hơn
-console.log("Player wins with higher rank:", this.getHandName(playerHandValue.rank), "vs", this.getHandName(aiHandValue.rank));
-this.gameState.winner = "player";
-result = "Bạn thắng với " + this.getHandName(playerHandValue.rank) + "!";
+    // Quyết định người thắng và hiển thị bài thắng
+    if (playerHandValue.rank > aiHandValue.rank) {
+        // Người chơi thắng vì có bộ bài mạnh hơn
+        console.log("Player wins with higher rank:", this.getHandName(playerHandValue.rank), "vs", this.getHandName(aiHandValue.rank));
+        this.gameState.winner = "player";
+        result = "Bạn thắng với " + this.getHandName(playerHandValue.rank) + "!";
 
-// Hiển thị bài thắng của người chơi
-this.highlightWinningCards(this.getHandName(playerHandValue.rank), this.getBestHand(this.gameState.playerCards, this.gameState.communityCards, playerHandValue));
+        // Hiển thị bài thắng của người chơi
+        this.highlightWinningCards(this.getHandName(playerHandValue.rank), this.getBestHand(this.gameState.playerCards, this.gameState.communityCards, playerHandValue));
 
-// QUAN TRỌNG: Đảm bảo callback luôn được gọi với timeout đủ lớn
-this.scheduleOnce(function() {
-    self.handleWinnerAnimation("player", result, potContainer);
-}, 0.5); // Thêm delay nhỏ để đảm bảo animation highlight hiển thị
+        // QUAN TRỌNG: Đảm bảo callback luôn được gọi với timeout đủ lớn
+        this.scheduleOnce(function() {
+            self.handleWinnerAnimation("player", result, potContainer);
+        }, 0.5);
 
-} else if (aiHandValue.rank > playerHandValue.rank) {
-// AI thắng vì có bộ bài mạnh hơn
-console.log("AI wins with higher rank:", this.getHandName(aiHandValue.rank), "vs", this.getHandName(playerHandValue.rank));
-this.gameState.winner = "ai";
-result = "AI thắng với " + this.getHandName(aiHandValue.rank) + "!";
+    } else if (aiHandValue.rank > playerHandValue.rank) {
+        // AI thắng vì có bộ bài mạnh hơn
+        console.log("AI wins with higher rank:", this.getHandName(aiHandValue.rank), "vs", this.getHandName(playerHandValue.rank));
+        this.gameState.winner = "ai";
+        result = "AI thắng với " + this.getHandName(aiHandValue.rank) + "!";
 
-// Hiển thị bài thắng của AI
-this.highlightWinningCards(this.getHandName(aiHandValue.rank), this.getBestHand(this.gameState.aiCards, this.gameState.communityCards, aiHandValue));
+        // Hiển thị bài thắng của AI
+        this.highlightWinningCards(this.getHandName(aiHandValue.rank), this.getBestHand(this.gameState.aiCards, this.gameState.communityCards, aiHandValue));
 
-// QUAN TRỌNG: Đảm bảo callback luôn được gọi với timeout đủ lớn
-this.scheduleOnce(function() {
-    self.handleWinnerAnimation("ai", result, potContainer);
-}, 0.5); // Thêm delay nhỏ để đảm bảo animation highlight hiển thị
+        // QUAN TRỌNG: Đảm bảo callback luôn được gọi với timeout đủ lớn
+        this.scheduleOnce(function() {
+            self.handleWinnerAnimation("ai", result, potContainer);
+        }, 0.5);
 
-} else {
-// Cùng rank, so sánh giá trị chi tiết
-var playerValues = playerHandValue.values;
-var aiValues = aiHandValue.values;
-
-console.log("Same rank, comparing card values:");
-console.log("Player values:", playerValues);
-console.log("AI values:", aiValues);
-
-// So sánh từng lá một, lá cao hơn sẽ thắng
-var isPlayerWin = false;
-var isAIWin = false;
-
-for (var i = 0; i < Math.min(playerValues.length, aiValues.length); i++) {
-    console.log("Comparing card #" + i + ": Player " + playerValues[i] + " vs AI " + aiValues[i]);
-    if (playerValues[i] > aiValues[i]) {
-        isPlayerWin = true;
-        console.log("Player card is higher");
-        break;
-    } else if (aiValues[i] > playerValues[i]) {
-        isAIWin = true;
-        console.log("AI card is higher");
-        break;
     } else {
-        console.log("Cards are equal, continuing comparison");
+        // Cùng rank, so sánh giá trị chi tiết
+        var playerValues = playerHandValue.values;
+        var aiValues = aiHandValue.values;
+
+        console.log("Same rank, comparing card values:");
+        console.log("Player values:", playerValues);
+        console.log("AI values:", aiValues);
+
+        // So sánh từng lá một, lá cao hơn sẽ thắng
+        var isPlayerWin = false;
+        var isAIWin = false;
+
+        for (var i = 0; i < Math.min(playerValues.length, aiValues.length); i++) {
+            console.log("Comparing card #" + i + ": Player " + playerValues[i] + " vs AI " + aiValues[i]);
+            if (playerValues[i] > aiValues[i]) {
+                isPlayerWin = true;
+                console.log("Player card is higher");
+                break;
+            } else if (aiValues[i] > playerValues[i]) {
+                isAIWin = true;
+                console.log("AI card is higher");
+                break;
+            } else {
+                console.log("Cards are equal, continuing comparison");
+            }
+        }
+
+        // Thêm hiển thị bài thắng tùy theo kết quả
+        if (isPlayerWin) {
+            this.gameState.winner = "player";
+            result = "Bạn thắng với " + this.getHandName(playerHandValue.rank) + "!";
+            this.highlightWinningCards(this.getHandName(playerHandValue.rank), this.getBestHand(this.gameState.playerCards, this.gameState.communityCards, playerHandValue));
+            
+            this.scheduleOnce(function() {
+                self.handleWinnerAnimation("player", result, potContainer);
+            }, 0.5);
+            
+        } else if (isAIWin) {
+            this.gameState.winner = "ai";
+            result = "AI thắng với " + this.getHandName(aiHandValue.rank) + "!";
+            this.highlightWinningCards(this.getHandName(aiHandValue.rank), this.getBestHand(this.gameState.aiCards, this.gameState.communityCards, aiHandValue));
+            
+            this.scheduleOnce(function() {
+                self.handleWinnerAnimation("ai", result, potContainer);
+            }, 0.5);
+            
+        } else {
+            // Nếu hòa, có thể hiển thị cả hai bộ bài và chia đều tiền
+            this.gameState.winner = "tie";
+            result = "Hòa với " + this.getHandName(playerHandValue.rank) + "!";
+            this.highlightWinningCards(this.getHandName(playerHandValue.rank) + " (Tie)", this.getBestHand(this.gameState.playerCards, this.gameState.communityCards, playerHandValue));
+            
+            this.scheduleOnce(function() {
+                self.handleWinnerAnimation("tie", result, potContainer);
+            }, 0.5);
+        }
     }
-}
 
-// Thêm hiển thị bài thắng tùy theo kết quả
-if (isPlayerWin) {
-    this.gameState.winner = "player";
-    result = "Bạn thắng với " + this.getHandName(playerHandValue.rank) + "!";
-    this.highlightWinningCards(this.getHandName(playerHandValue.rank), this.getBestHand(this.gameState.playerCards, this.gameState.communityCards, playerHandValue));
-    
-    this.scheduleOnce(function() {
-        self.handleWinnerAnimation("player", result, potContainer);
-    }, 0.5);
-    
-} else if (isAIWin) {
-    this.gameState.winner = "ai";
-    result = "AI thắng với " + this.getHandName(aiHandValue.rank) + "!";
-    this.highlightWinningCards(this.getHandName(aiHandValue.rank), this.getBestHand(this.gameState.aiCards, this.gameState.communityCards, aiHandValue));
-    
-    this.scheduleOnce(function() {
-        self.handleWinnerAnimation("ai", result, potContainer);
-    }, 0.5);
-    
-} else {
-    // Nếu hòa, có thể hiển thị cả hai bộ bài và chia đều tiền
-    this.gameState.winner = "tie";
-    result = "Hòa với " + this.getHandName(playerHandValue.rank) + "!";
-    this.highlightWinningCards(this.getHandName(playerHandValue.rank) + " (Tie)", this.getBestHand(this.gameState.playerCards, this.gameState.communityCards, playerHandValue));
-    
-    this.scheduleOnce(function() {
-        self.handleWinnerAnimation("tie", result, potContainer);
-    }, 0.5);
-}
-}
+    console.log("Final result:", result);
+    console.log("----------------------------");
 
-console.log("Final result:", result);
-console.log("----------------------------");
-
-// Thêm một fallback để đảm bảo game không bị treo
-this.scheduleOnce(function() {
-// Kiểm tra xem pot còn tồn tại không (nếu không tồn tại, animation đã diễn ra)
-if (self.gameState.pot > 0) {
-    console.log("FALLBACK: Đang xử lý pot còn lại, có thể animation không diễn ra");
-    
-    // Tính phí 4% và làm tròn xuống
-    var totalPot = self.gameState.pot;
-    var amountAfterFee = Math.floor(totalPot * 0.96);
-    
-    // Gán tiền trực tiếp cho người thắng hoặc chia đều
-    if (self.gameState.winner === "player") {
-        self.gameState.playerStack += amountAfterFee;
-    } else if (self.gameState.winner === "ai") {
-        self.gameState.aiStack += amountAfterFee;
-    } else {
-        // Chia đều tiền khi hòa
-        var halfPot = Math.floor(totalPot / 2);
-        var playerAmount = Math.floor(halfPot * 0.96);
-        var aiAmount = Math.floor(halfPot * 0.96);
-        
-        self.gameState.playerStack += playerAmount;
-        self.gameState.aiStack += aiAmount;
-    }
-    
-    self.gameState.pot = 0;
-    self.updateStackDisplay();
-    self.updatePotDisplay();
-    
-    // Bắt đầu ván mới
-    self.scheduleOnce(function() {
-        self.startNewHand();
-    }, 3.0);
-}
-}, 8.0); // Thời gian dài hơn để đảm bảo animation đã diễn ra hoặc bị treo
+    // Thêm một fallback để đảm bảo game không bị treo
+    this.scheduleOnce(function() {
+        // Kiểm tra xem pot còn tồn tại không (nếu không tồn tại, animation đã diễn ra)
+        if (self.gameState.pot > 0) {
+            console.log("FALLBACK: Đang xử lý pot còn lại, có thể animation không diễn ra");
+            
+            // Tính phí 4% và làm tròn xuống
+            var totalPot = self.gameState.pot;
+            var amountAfterFee = Math.floor(totalPot * 0.96);
+            
+            // Gán tiền trực tiếp cho người thắng hoặc chia đều
+            if (self.gameState.winner === "player") {
+                // Cập nhật trực tiếp vào ví người chơi
+                self.gameState.playerWallet += amountAfterFee;
+                
+                // Đồng bộ ví về server
+                if (window.GameBackEndBridge) {
+                    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet);
+                }
+            } else if (self.gameState.winner === "ai") {
+                self.gameState.aiStack += amountAfterFee;
+            } else {
+                // Chia đều tiền khi hòa
+                var halfPot = Math.floor(totalPot / 2);
+                var playerAmount = Math.floor(halfPot * 0.96);
+                var aiAmount = Math.floor(halfPot * 0.96);
+                
+                // Cập nhật ví người chơi và đồng bộ về server
+                self.gameState.playerWallet += playerAmount;
+                self.gameState.aiStack += aiAmount;
+                
+                if (window.GameBackEndBridge) {
+                    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet);
+                }
+            }
+            
+            self.gameState.pot = 0;
+            self.updateStackDisplay();
+            self.updatePotDisplay();
+            self.displayWalletInfo();
+            
+            // Bắt đầu ván mới
+            self.scheduleOnce(function() {
+                self.startNewHand();
+            }, 3.0);
+        }
+    }, 8.0);
 },
 
 // Xử lý animation người thắng
@@ -4571,35 +4589,145 @@ integrateWithGameScene() {
     // Lưu lại phương thức handleWinnerAnimation gốc
     const originalHandleWinner = MyScene.prototype.handleWinnerAnimation;
     
-    // Ghi đè để đồng bộ điểm với server sau khi kết thúc ván đấu
-    MyScene.prototype.handleWinnerAnimation = function(winner, resultMessage, potContainer) {
-        console.log("handleWinnerAnimation được gọi với:", winner, "pot:", this.gameState.pot);
-        
-        // Gọi phương thức gốc trước
-        originalHandleWinner.call(this, winner, resultMessage, potContainer);
-        
-        // Đồng bộ điểm với server
-        self.syncGameResult(winner, this.gameState.pot);
-    };
+   // Sửa lại phương thức handleWinnerAnimation để cập nhật số tiền thắng vào ví người chơi
+MyScene.prototype.handleWinnerAnimation = function(winner, resultMessage, potContainer) {
+    var self = this;
+    var size = cc.director.getWinSize();
+
+    // Tổng số chip trong pot
+    var totalPot = this.gameState.pot;
+
+    // Tính phí chia bài 4% - giữ nguyên số thập phân
+    var amountAfterFee = totalPot * 0.96;
+
+    // Xác định vị trí người chơi chiến thắng
+    var targetPos;
+    if (winner === "player") {
+        targetPos = this.bottomPlayer ? this.bottomPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.19);
+
+        // Animation chip bay từ pot đến người chơi
+        this.flyChipsFromPotToPlayer(targetPos, amountAfterFee, function() {
+            // *** THAY ĐỔI Ở ĐÂY: Cập nhật trực tiếp vào ví thay vì stack ***
+            // Thay vì cộng vào stack, ta cộng trực tiếp vào ví
+            self.gameState.playerWallet += amountAfterFee;
+            self.gameState.pot = 0;
+            
+            // Cập nhật stack từ ví để hiển thị
+            self.refillPlayerStack();
+            
+            // Cập nhật hiển thị
+            self.updateStackDisplay();
+            self.updatePotDisplay();
+            self.displayWalletInfo();
+            
+            // *** THAY ĐỔI Ở ĐÂY: Đồng bộ số dư ví mới về server ngay lập tức ***
+            if (window.GameBackEndBridge) {
+                window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet)
+                    .then(result => {
+                        console.log("Đã cập nhật số dư ví mới về server sau khi thắng:", result);
+                    })
+                    .catch(err => {
+                        console.error("Lỗi khi cập nhật số dư ví về server:", err);
+                    });
+            }
+            
+            // Đợi một chút rồi bắt đầu ván mới
+            self.scheduleOnce(function() {
+                self.startNewHand();
+            }, 1.5);
+        });
+    } 
+    else if (winner === "ai") {
+        // AI thắng, không cần thay đổi gì vì không ảnh hưởng đến ví người chơi
+        targetPos = this.topPlayer ? this.topPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.88);
+
+        this.flyChipsFromPotToPlayer(targetPos, amountAfterFee, function() {
+            self.gameState.aiStack += amountAfterFee;
+            self.gameState.pot = 0;
+            
+            self.updateStackDisplay();
+            self.updatePotDisplay();
+            
+            self.scheduleOnce(function() {
+                self.startNewHand();
+            }, 1.5);
+        });
+    }
+    else {
+        // Xử lý trường hợp hòa
+        var halfPot = totalPot / 2;
+        var playerAmount = halfPot * 0.96;
+        var aiAmount = halfPot * 0.96;
+
+        // Ẩn container pot ban đầu nếu có
+        if (potContainer) {
+            potContainer.setVisible(false);
+        }
+
+        var playerPos = this.bottomPlayer ? this.bottomPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.19);
+        this.flyChipsFromPotToPlayer(playerPos, playerAmount, function() {
+            var aiPos = self.topPlayer ? self.topPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.88);
+            self.flyChipsFromPotToPlayer(aiPos, aiAmount, function() {
+                // *** THAY ĐỔI Ở ĐÂY: Cập nhật trực tiếp vào ví thay vì stack ***
+                self.gameState.playerWallet += playerAmount;
+                self.gameState.aiStack += aiAmount;
+                self.gameState.pot = 0;
+                
+                // Cập nhật stack từ ví
+                self.refillPlayerStack();
+                
+                // Cập nhật hiển thị
+                self.updateStackDisplay();
+                self.updatePotDisplay();
+                self.displayWalletInfo();
+                
+                // *** THAY ĐỔI Ở ĐÂY: Đồng bộ số dư ví mới về server ngay lập tức ***
+                if (window.GameBackEndBridge) {
+                    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet)
+                        .then(result => {
+                            console.log("Đã cập nhật số dư ví mới về server sau khi hòa:", result);
+                        })
+                        .catch(err => {
+                            console.error("Lỗi khi cập nhật số dư ví về server:", err);
+                        });
+                }
+                
+                self.scheduleOnce(function() {
+                    self.startNewHand();
+                }, 1.5);
+            });
+        });
+    }
+};
     
     // Sửa đổi balancePlayerStack để đồng bộ với server
     const originalBalancePlayer = MyScene.prototype.balancePlayerStack;
     
     MyScene.prototype.balancePlayerStack = function() {
-        console.log("balancePlayerStack được gọi");
-        
-        // Gọi phương thức gốc trước
-        originalBalancePlayer.call(this);
-        
-        // Kiểm tra và đồng bộ ví định kỳ
-        self.getGamePoints()
+        // Chỉ cần đảm bảo stack không vượt quá mức mặc định
+        if (this.gameState.playerStack > this.gameState.playerDefaultStack) {
+            // Đặt lại stack về giá trị mặc định
+            this.gameState.playerStack = this.gameState.playerDefaultStack;
+            console.log("Player stack capped at maximum:", this.gameState.playerDefaultStack);
+        }
+        // Nếu stack < defaultStack, bổ sung từ ví nếu có thể
+        else if (this.gameState.playerStack < this.gameState.playerDefaultStack) {
+            this.refillPlayerStack();
+        }
+    };
+    
+    // Thêm một phương thức tiện ích mới để kiểm tra và đồng bộ số dư ví
+MyScene.prototype.syncWalletWithServer = function() {
+    if (window.GameBackEndBridge) {
+        window.GameBackEndBridge.updateWalletDirectly(this.gameState.playerWallet)
             .then(result => {
-                console.log("Đã kiểm tra và đồng bộ ví game");
+                console.log("Đã đồng bộ thành công số dư ví với server:", result);
             })
             .catch(err => {
-                console.error("Lỗi khi đồng bộ ví game:", err);
+                console.error("Lỗi khi đồng bộ số dư ví với server:", err);
             });
-    };
+    }
+};
     
     console.log("Đã tích hợp GameBackEndBridge với MyScene");
 }
