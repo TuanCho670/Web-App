@@ -1932,10 +1932,7 @@ for (var i = 0; i < numChips; i++) {
                             }
                         }
 
-                        if (window.GameBackEndBridge) {
-                            console.log("Fallback: Gọi syncGameResult để đồng bộ kết quả về sheet");
-                            window.GameBackEndBridge.syncGameResult(winner, totalPot);
-                        }
+                       
                         
                         // Gọi callback khi hoàn thành
                         if (typeof callback === 'function') {
@@ -3046,16 +3043,24 @@ showdown: function() {
                 // Đồng bộ ví về server
                 if (window.GameBackEndBridge) {
                     window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet);
+                    
+                    // Sửa lỗi: Sử dụng self.gameState.winner thay vì winner
+                    var winnerValue = self.gameState.winner;
+                    console.log("Fallback: Gọi syncGameResult để đồng bộ kết quả về sheet, winner:", winnerValue);
+                    window.GameBackEndBridge.syncGameResult(winnerValue, totalPot);
                 }
-                
-                // Đảm bảo AI stack về đúng 32
-                self.balanceAIStack();
             } else if (self.gameState.winner === "ai") {
-                // Cộng tiền vào stack của AI
+                // QUAN TRỌNG: Cộng tiền vào stack của AI
                 self.gameState.aiStack += amountAfterFee;
+                console.log("FALLBACK AI win - AI stack increased to:", self.gameState.aiStack);
                 
-                // Sau đó reset về đúng 32
-                self.balanceAIStack();
+                // Đồng bộ kết quả về server
+                if (window.GameBackEndBridge) {
+                    // Sửa lỗi: Sử dụng self.gameState.winner thay vì winner
+                    var winnerValue = self.gameState.winner;
+                    console.log("Fallback: Gọi syncGameResult để đồng bộ kết quả về sheet, winner:", winnerValue);
+                    window.GameBackEndBridge.syncGameResult(winnerValue, totalPot);
+                }
             } else {
                 // Chia đều tiền khi hòa
                 var halfPot = Math.floor(totalPot / 2);
@@ -3065,12 +3070,17 @@ showdown: function() {
                 // Cập nhật ví người chơi và đồng bộ về server
                 self.gameState.playerWallet += playerAmount;
                 
-                // Cộng tiền vào stack của AI rồi reset về 32
+                // QUAN TRỌNG: Cộng tiền vào stack của AI
                 self.gameState.aiStack += aiAmount;
-                self.balanceAIStack();
+                console.log("FALLBACK tie - AI stack increased to:", self.gameState.aiStack);
                 
                 if (window.GameBackEndBridge) {
                     window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet);
+                    
+                    // Sửa lỗi: Sử dụng self.gameState.winner thay vì winner
+                    var winnerValue = self.gameState.winner;
+                    console.log("Fallback: Gọi syncGameResult để đồng bộ kết quả về sheet, winner:", winnerValue);
+                    window.GameBackEndBridge.syncGameResult(winnerValue, totalPot);
                 }
             }
             
