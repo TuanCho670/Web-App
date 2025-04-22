@@ -3129,7 +3129,12 @@ targetPos = this.bottomPlayer ? this.bottomPlayer.getPosition() : cc.p(size.widt
 // Animation chip bay từ pot đến người chơi
 this.flyChipsFromPotToPlayer(targetPos, amountAfterFee, function() {
     // Cập nhật tiền
-    self.gameState.playerStack += amountAfterFee;
+    self.gameState.playerWallet += amountAfterFee;
+// Sau đó gọi:
+if (window.GameBackEndBridge) {
+    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet);
+}
+
     self.gameState.pot = 0;
     
     // Cân bằng stack - chuyển phần dư vào ví
