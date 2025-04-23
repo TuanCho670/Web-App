@@ -1437,24 +1437,37 @@ console.log("Cannot show buttons - not initialized");
             
             var self = this;
             
-            // Animation chip bay từ pot đến người chơi
-            this.flyChipsFromPotToPlayer(self.bottomPlayer.getPosition(), amountAfterFee, function() {
-                // Cập nhật tiền
-                self.gameState.playerStack += amountAfterFee;
-                self.gameState.pot = 0;
-                
-                // Cân bằng stack
-                self.balancePlayerStack();
-                
-                // Cập nhật hiển thị
-                self.updateStackDisplay();
-                self.updatePotDisplay();
-                
-                // Bắt đầu ván mới
-                self.scheduleOnce(function() {
-                    self.startNewHand();
-                }, 3.0);
+         // Animation chip bay từ pot đến người chơi
+this.flyChipsFromPotToPlayer(self.bottomPlayer.getPosition(), amountAfterFee, function() {
+    // Cập nhật tiền trực tiếp vào ví người chơi thay vì stack
+    self.gameState.playerWallet += amountAfterFee;
+    self.gameState.pot = 0;
+    
+    // Cập nhật stack từ ví nếu cần
+    self.refillPlayerStack();
+    
+    // Cập nhật hiển thị
+    self.updateStackDisplay();
+    self.updatePotDisplay();
+    self.displayWalletInfo();
+    
+    // Đồng bộ số dư ví mới về server
+    if (window.GameBackEndBridge) {
+        console.log("Cập nhật số dư ví mới vào server sau khi AI fold:", self.gameState.playerWallet);
+        window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet)
+            .then(result => {
+                console.log("✅ Đã cập nhật số dư ví mới về server thành công:", result);
+            })
+            .catch(err => {
+                console.error("❌ Lỗi khi cập nhật số dư ví về server:", err);
             });
+    }
+    
+    // Bắt đầu ván mới
+    self.scheduleOnce(function() {
+        self.startNewHand();
+    }, 1.5); // Giảm thời gian chờ từ 3.0 xuống 1.5 để tương đồng với các trường hợp khác
+});
         }
     },
 
@@ -3025,57 +3038,57 @@ showdown: function() {
     console.log("Final result:", result);
     console.log("----------------------------");
 
-    // Thêm một fallback để đảm bảo game không bị treo
-    this.scheduleOnce(function() {
-        // Kiểm tra xem pot còn tồn tại không (nếu không tồn tại, animation đã diễn ra)
-        if (self.gameState.pot > 0) {
-            console.log("FALLBACK: Đang xử lý pot còn lại, có thể animation không diễn ra");
+// Thêm một fallback để đảm bảo game không bị treo
+this.scheduleOnce(function() {
+    // Kiểm tra xem pot còn tồn tại không (nếu không tồn tại, animation đã diễn ra)
+    if (self.gameState.pot > 0) {
+        console.log("FALLBACK: Đang xử lý pot còn lại, có thể animation không diễn ra");
+        
+        // Tính phí 4% và làm tròn xuống
+        var totalPot = self.gameState.pot;
+        var amountAfterFee = Math.floor(totalPot * 0.96);
+        
+        // Gán tiền trực tiếp cho người thắng hoặc chia đều
+        if (self.gameState.winner === "player") {
+            // Cập nhật trực tiếp vào ví người chơi
+            self.gameState.playerWallet += amountAfterFee;
             
-            // Tính phí 4% và làm tròn xuống
-            var totalPot = self.gameState.pot;
-            var amountAfterFee = Math.floor(totalPot * 0.96);
+           
+           
+        } else if (self.gameState.winner === "ai") {
+            // QUAN TRỌNG: Cộng tiền vào stack của AI
+            self.gameState.aiStack += amountAfterFee;
+            console.log("FALLBACK AI win - AI stack increased to:", self.gameState.aiStack);
             
-            // Gán tiền trực tiếp cho người thắng hoặc chia đều
-            if (self.gameState.winner === "player") {
-                // Cập nhật trực tiếp vào ví người chơi
-                self.gameState.playerWallet += amountAfterFee;
-                
-               
-               
-            } else if (self.gameState.winner === "ai") {
-                // QUAN TRỌNG: Cộng tiền vào stack của AI
-                self.gameState.aiStack += amountAfterFee;
-                console.log("FALLBACK AI win - AI stack increased to:", self.gameState.aiStack);
-                
-              
-               
-            } else {
-                // Chia đều tiền khi hòa
-                var halfPot = Math.floor(totalPot / 2);
-                var playerAmount = Math.floor(halfPot * 0.96);
-                var aiAmount = Math.floor(halfPot * 0.96);
-                
-                // Cập nhật ví người chơi
-                self.gameState.playerWallet += playerAmount;
-                
-                // QUAN TRỌNG: Cộng tiền vào stack của AI
-                self.gameState.aiStack += aiAmount;
-                console.log("FALLBACK tie - AI stack increased to:", self.gameState.aiStack);
-                
-               
-            }
+          
+           
+        } else {
+            // Chia đều tiền khi hòa
+            var halfPot = Math.floor(totalPot / 2);
+            var playerAmount = Math.floor(halfPot * 0.96);
+            var aiAmount = Math.floor(halfPot * 0.96);
             
-            self.gameState.pot = 0;
-            self.updateStackDisplay();
-            self.updatePotDisplay();
-            self.displayWalletInfo();
+            // Cập nhật ví người chơi
+            self.gameState.playerWallet += playerAmount;
             
-            // Bắt đầu ván mới
-            self.scheduleOnce(function() {
-                self.startNewHand();
-            }, 3.0);
+            // QUAN TRỌNG: Cộng tiền vào stack của AI
+            self.gameState.aiStack += aiAmount;
+            console.log("FALLBACK tie - AI stack increased to:", self.gameState.aiStack);
+            
+           
         }
-    }, 8.0);
+        
+        self.gameState.pot = 0;
+        self.updateStackDisplay();
+        self.updatePotDisplay();
+        self.displayWalletInfo();
+        
+        // Bắt đầu ván mới
+        self.scheduleOnce(function() {
+            self.startNewHand();
+        }, 3.0);
+    }
+}, 8.0);
     
     // Log trạng thái AI sau khi showdown
     console.log("AFTER showdown function - AI stack:", this.gameState.aiStack);
