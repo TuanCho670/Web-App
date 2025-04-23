@@ -2680,8 +2680,8 @@ this.walletLabel.enableShadow(cc.color(0, 0, 0, 255), cc.size(3, -3), 2);
 this.addChild(this.walletLabel, 10);
 },
 
-// Sửa lại phương thức refillPlayerStack trong MyScene
-refillPlayerStack: function() {
+// Hàm refillPlayerStack() hoàn chỉnh với tham số skipApiCall
+refillPlayerStack: function(skipApiCall) {
     // Kiểm tra xem người chơi có đủ chip mặc định không
     if (this.gameState.playerStack < this.gameState.playerDefaultStack) {
         console.log("Player stack is below default amount, refilling from wallet");
@@ -2699,13 +2699,13 @@ refillPlayerStack: function() {
             console.log("Refilled player stack to:", this.gameState.playerDefaultStack);
             console.log("Player wallet reduced from", oldWalletAmount, "to", this.gameState.playerWallet);
             
-            // Đồng bộ số dư ví mới về server ngay lập tức
-            if (window.GameBackEndBridge) {
+            // Đồng bộ số dư ví mới về server ngay lập tức nếu không yêu cầu bỏ qua
+            if (window.GameBackEndBridge && !skipApiCall) {
                 window.GameBackEndBridge.updateWalletDirectly(this.gameState.playerWallet)
-                    .then(result => {
+                    .then(function(result) {
                         console.log("Đã cập nhật số dư ví về server:", result);
                     })
-                    .catch(err => {
+                    .catch(function(err) {
                         console.error("Lỗi khi cập nhật số dư ví:", err);
                     });
             }
@@ -2720,13 +2720,13 @@ refillPlayerStack: function() {
             console.log("Partially refilled player stack to:", this.gameState.playerStack);
             console.log("Player wallet is now empty, reduced from", oldWalletAmount);
             
-            // Đồng bộ số dư ví mới về server ngay lập tức
-            if (window.GameBackEndBridge) {
+            // Đồng bộ số dư ví mới về server ngay lập tức nếu không yêu cầu bỏ qua
+            if (window.GameBackEndBridge && !skipApiCall) {
                 window.GameBackEndBridge.updateWalletDirectly(0)
-                    .then(result => {
+                    .then(function(result) {
                         console.log("Đã cập nhật số dư ví về server:", result);
                     })
-                    .catch(err => {
+                    .catch(function(err) {
                         console.error("Lỗi khi cập nhật số dư ví:", err);
                     });
             }
@@ -3094,95 +3094,145 @@ this.scheduleOnce(function() {
     console.log("AFTER showdown function - AI stack:", this.gameState.aiStack);
 },
 
-// Xử lý animation người thắng
 handleWinnerAnimation: function(winner, resultMessage, potContainer) {
-var self = this;
-var size = cc.director.getWinSize();
+    var self = this;
+    var size = cc.director.getWinSize();
 
-// Tổng số chip trong pot
-var totalPot = this.gameState.pot;
+    // Tổng số chip trong pot
+    var totalPot = this.gameState.pot;
 
-// Tính phí chia bài 4% - giữ nguyên số thập phân
-var amountAfterFee = totalPot * 0.96;
+    // Tính phí chia bài 4% - giữ nguyên số thập phân
+    var amountAfterFee = totalPot * 0.96;
 
-// Xác định vị trí người chơi chiến thắng
-var targetPos;
-if (winner === "player") {
-targetPos = this.bottomPlayer ? this.bottomPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.19);
+    // Ghi log số tiền AI có trước khi thắng/thua
+    console.log("BEFORE animation - AI stack:", this.gameState.aiStack);
 
-// Animation chip bay từ pot đến người chơi
-this.flyChipsFromPotToPlayer(targetPos, amountAfterFee, function() {
-    // Cập nhật tiền
-    self.gameState.playerWallet += amountAfterFee;
-// Sau đó gọi:
-if (window.GameBackEndBridge) {
-    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet);
-}
+    // Xác định vị trí người chơi chiến thắng
+    var targetPos;
+    if (winner === "player") {
+        targetPos = this.bottomPlayer ? this.bottomPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.19);
 
-    self.gameState.pot = 0;
-    
-    // Cân bằng stack - chuyển phần dư vào ví
-    self.balancePlayerStack();
-    
-    // Cập nhật hiển thị
-    self.updateStackDisplay();
-    self.updatePotDisplay();
-    self.displayWalletInfo();
-    
-    // Đợi một chút rồi bắt đầu ván mới
-    self.scheduleOnce(function() {
-        self.startNewHand();
-    }, 1.5); // Giảm thời gian chờ từ 3.0 xuống 1.5
-});
-} 
-else if (winner === "ai") {
-// Code tương tự cho AI thắng
-targetPos = this.topPlayer ? this.topPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.88);
+        // Animation chip bay từ pot đến người chơi
+        this.flyChipsFromPotToPlayer(targetPos, amountAfterFee, function() {
+            // Cập nhật tiền vào ví người chơi thay vì stack
+            self.gameState.playerWallet += amountAfterFee;
+            self.gameState.pot = 0;
+            
+            // Cập nhật stack từ ví để hiển thị - bỏ qua việc gọi API
+            self.refillPlayerStack(true);
+            
+            // Cập nhật hiển thị
+            self.updateStackDisplay();
+            self.updatePotDisplay();
+            self.displayWalletInfo();
+            
+            // Đồng bộ số dư ví mới về server - CHỈ GỌI API 1 LẦN Ở ĐÂY sau khi đã cập nhật hết
+            if (window.GameBackEndBridge) {
+                console.log("Cập nhật số dư ví mới vào server sau khi người chơi thắng:", self.gameState.playerWallet);
+                window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet)
+                    .then(function(result) {
+                        console.log("✅ Đã cập nhật số dư ví mới về server thành công:", result);
+                    })
+                    .catch(function(err) {
+                        console.error("❌ Lỗi khi cập nhật số dư ví về server:", err);
+                    });
+            }
+            
+            // Luôn đưa AI stack về đúng 32 
+            self.balanceAIStack();
+            console.log("AFTER player win - AI stack balanced to:", self.gameState.aiStack);
+            
+            // Đợi một chút rồi bắt đầu ván mới
+            self.scheduleOnce(function() {
+                self.startNewHand();
+            }, 1.5);
+        });
+    } 
+    else if (winner === "ai") {
+        targetPos = this.topPlayer ? this.topPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.88);
 
-this.flyChipsFromPotToPlayer(targetPos, amountAfterFee, function() {
-    self.gameState.aiStack += amountAfterFee;
-    self.gameState.pot = 0;
-    
-    self.updateStackDisplay();
-    self.updatePotDisplay();
-    
-    self.scheduleOnce(function() {
-        self.startNewHand();
-    }, 1.5);
-});
-}
-else {
-// Code cho trường hợp hòa
-var halfPot = totalPot / 2;
-var playerAmount = halfPot * 0.96;
-var aiAmount = halfPot * 0.96;
+        this.flyChipsFromPotToPlayer(targetPos, amountAfterFee, function() {
+            // Cộng tiền vào stack của AI
+            var oldStack = self.gameState.aiStack;
+            self.gameState.aiStack += amountAfterFee;
+            console.log("AI stack temporary increased from", oldStack, "to", self.gameState.aiStack);
+            
+            // Luôn đưa AI stack về đúng 32
+            var surplus = self.gameState.aiStack - self.gameState.aiDefaultStack;
+            if (surplus > 0) {
+                console.log("Removing surplus", surplus, "chips from AI to maintain 32 chips");
+            }
+            
+            self.balanceAIStack();
+            self.gameState.pot = 0;
+            
+            // Ghi log số tiền AI sau khi cân bằng
+            console.log("AFTER AI win - AI stack balanced to:", self.gameState.aiStack);
+            
+            self.updateStackDisplay();
+            self.updatePotDisplay();
+            
+            self.scheduleOnce(function() {
+                self.startNewHand();
+            }, 1.5);
+        });
+    }
+    else {
+        // Xử lý trường hợp hòa
+        var halfPot = totalPot / 2;
+        var playerAmount = halfPot * 0.96;
+        var aiAmount = halfPot * 0.96;
 
-// Ẩn container pot ban đầu nếu có
-if (potContainer) {
-    potContainer.setVisible(false);
-}
+        // Ẩn container pot ban đầu nếu có
+        if (potContainer) {
+            potContainer.setVisible(false);
+        }
 
-var playerPos = this.bottomPlayer ? this.bottomPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.19);
-this.flyChipsFromPotToPlayer(playerPos, playerAmount, function() {
-    var aiPos = self.topPlayer ? self.topPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.88);
-    self.flyChipsFromPotToPlayer(aiPos, aiAmount, function() {
-        self.gameState.playerStack += playerAmount;
-        self.gameState.aiStack += aiAmount;
-        self.gameState.pot = 0;
-        
-        self.balancePlayerStack();
-        self.balanceAIStack();
-        
-        self.updateStackDisplay();
-        self.updatePotDisplay();
-        self.displayWalletInfo();
-        
-        self.scheduleOnce(function() {
-            self.startNewHand();
-        }, 1.5);
-    });
-});
-}
+        var playerPos = this.bottomPlayer ? this.bottomPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.19);
+        this.flyChipsFromPotToPlayer(playerPos, playerAmount, function() {
+            var aiPos = self.topPlayer ? self.topPlayer.getPosition() : cc.p(size.width / 2, size.height * 0.88);
+            self.flyChipsFromPotToPlayer(aiPos, aiAmount, function() {
+                // Cập nhật ví người chơi thay vì stack
+                self.gameState.playerWallet += playerAmount;
+                
+                // Cộng tiền vào stack của AI trước khi balance
+                var oldStack = self.gameState.aiStack;
+                self.gameState.aiStack += aiAmount;
+                console.log("AI stack temporary increased from", oldStack, "to", self.gameState.aiStack);
+                
+                // Luôn đưa AI stack về đúng 32
+                self.balanceAIStack();
+                self.gameState.pot = 0;
+                
+                // Ghi log số tiền AI sau khi cân bằng
+                console.log("AFTER tie - AI stack balanced to:", self.gameState.aiStack);
+                
+                // Cập nhật stack từ ví - bỏ qua việc gọi API
+                self.refillPlayerStack(true);
+                
+                // Cập nhật hiển thị
+                self.updateStackDisplay();
+                self.updatePotDisplay();
+                self.displayWalletInfo();
+                
+                // Đồng bộ số dư ví mới về server - CHỈ GỌI API 1 LẦN Ở ĐÂY
+                if (window.GameBackEndBridge) {
+                    console.log("Cập nhật số dư ví mới vào server sau khi hòa:", self.gameState.playerWallet);
+                    window.GameBackEndBridge.updateWalletDirectly(self.gameState.playerWallet)
+                        .then(function(result) {
+                            console.log("✅ Đã cập nhật số dư ví mới về server thành công:", result);
+                        })
+                        .catch(function(err) {
+                            console.error("❌ Lỗi khi cập nhật số dư ví về server:", err);
+                        });
+                }
+                
+                self.scheduleOnce(function() {
+                    self.startNewHand();
+                }, 1.5);
+            });
+        });
+    }
 },
 
 // Đánh giá chi tiết bộ bài
